@@ -1,10 +1,3 @@
-# OpenGL project template
+# SDF Renderer
 
-Template for OpenGL project configured with CMAKE.
-
-Dependencies:
-- GLAD (OpenGL loading library)
-- GLFW (Windows manager library)
-- glm (OpenGL Mathematics)
-- ImGui (UI)
-- stb (Image Loader) 
+Simple SDF (Signed Distance Fields) raymarching renderer.

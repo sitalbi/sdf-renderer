@@ -1,21 +1,29 @@
 #version 450 core
 
+struct HitSurface
+{
+    float dist;
+    vec3 color;
+};
+
 struct Sphere
 {
     vec3 center;
     float radius;
+    vec3 color;
 };
 
 uniform Sphere uSpheres[64];
 uniform int uSphereCount;
 
+uniform vec3 uLightPosition;
+
+uniform vec3 uBackgroundColor;
 
 uniform vec2 uResolution;
 
 uniform mat4 uInverseViewProj;
 uniform vec3 uCameraPos;
-
-
 
 out vec4 FragColor;
 
@@ -28,36 +36,60 @@ float sdSphere(vec3 position, vec3 center, float radius)
     return length(position - center) - radius;
 }
 
-float sdScene(vec3 position)
+HitSurface sdScene(vec3 position)
 {
-    float minDist = 1e20;
+    HitSurface hit;
+    hit.dist = 1e20;
     for (int i = 0; i < uSphereCount; ++i)
     {
         float d = sdSphere(position, uSpheres[i].center, uSpheres[i].radius);
-        minDist = min(minDist, d);
+        if(d<hit.dist)
+        {
+            hit.dist = d;
+            hit.color = uSpheres[i].color;
+        }
     }
-
-    return minDist;
+    return hit;
 }
 
-float raymarch(vec3 ro, vec3 rd)
+HitSurface raymarch(vec3 ro, vec3 rd)
 {
     float t = 0.0;
+    HitSurface hit;
 
     for (int i = 0; i < MAX_STEPS; ++i)
     {
         vec3 p = ro + rd * t;
-        float d = sdScene(p);
+        hit = sdScene(p);
     
-        if (d < EPSILON)
-            return t;
-    
-        t += d;
+        if (hit.dist < EPSILON)
+        {
+            hit.dist = t;
+            return hit;
+        }
+
+        t += hit.dist;
     
         if (t > MAX_DIST)
+        {
             break;
+        }
     }
-    return 0.0;
+
+    hit.dist = 0.0;
+    return hit;
+}
+
+vec3 getNormal(vec3 p)
+{
+    float e = 0.001;
+    vec2 h = vec2(e, 0.0);
+
+    return normalize(vec3(
+        sdScene(p + vec3(h.x, h.y, h.y)).dist - sdScene(p - vec3(h.x, h.y, h.y)).dist,
+        sdScene(p + vec3(h.y, h.x, h.y)).dist - sdScene(p - vec3(h.y, h.x, h.y)).dist,
+        sdScene(p + vec3(h.y, h.y, h.x)).dist - sdScene(p - vec3(h.y, h.y, h.x)).dist
+    ));
 }
 
 void main()
@@ -72,14 +104,21 @@ void main()
     vec3 rd = normalize(world.xyz - ro);
 
 
-	float t = raymarch(ro, rd);
+	HitSurface hit = raymarch(ro, rd);
 
-    if (t > 0.0)
+    if (hit.dist > 0.0)
     {
-        FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        vec3 p = ro + rd * hit.dist;
+        vec3 n = getNormal(p);
+        vec3 lightDir = normalize(uLightPosition - p);
+        float diffuse = clamp(dot(n, lightDir), 0.0, 1.0);
+        float ambient = 0.3;
+
+        vec3 color = (diffuse + ambient) * hit.color;
+        FragColor = vec4(color, 1.0);
     }
     else
     {
-        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        FragColor = vec4(uBackgroundColor, 1.0);
     }
 }

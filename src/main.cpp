@@ -95,12 +95,17 @@ int main(void)
     
     shader.setUniformVec2f("uResolution", camera.getResolution());
 
+    shader.setUniformVec3f("uLightPosition", glm::vec3(5, 3, 0));
+    shader.setUniformVec3f("uBackgroundColor", glm::vec3(0.15f));
+
 
     shader.setUniformVec3f("uSpheres[0].center", glm::vec3(0,0,0));
     shader.setUniform1f("uSpheres[0].radius", 1.f);
+    shader.setUniformVec3f("uSpheres[0].color", glm::vec3(1.0,0,0));
 	
 	shader.setUniformVec3f("uSpheres[1].center", glm::vec3(3,0,0));
     shader.setUniform1f("uSpheres[1].radius", 0.5f);
+    shader.setUniformVec3f("uSpheres[1].color", glm::vec3(0.1,1,0.1));
 
 
     shader.setUniform1i("uSphereCount", 2);

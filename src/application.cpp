@@ -9,6 +9,7 @@
 #include <imgui_impl_opengl3.h>
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include <glm/gtc/type_ptr.hpp>
 
 
 
@@ -88,6 +89,12 @@ int Application::init()
 
 	setCallbacks();
 
+	m_spheres.push_back({ glm::vec3(0, 0, 0), 1.f,glm::vec3(1.0, 0, 0) });
+	m_spheres.push_back({ glm::vec3(1.5, 0, 0),  0.5f,glm::vec3(0.1, 1, 0.1) });
+
+	m_boxes.push_back({ glm::vec3(0, -2, 0),glm::vec3(2, 1, 1), 0.1f, glm::vec3(1.0, 1.0, 0) });
+	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f, glm::vec3(0.1, 0.1, 1.0) });
+
 	// Create and compile our GLSL program from the shaders
 	m_shader = new Shader(RES_DIR "/shaders/default_vert.glsl", RES_DIR"/shaders/sdf_frag.glsl");
 
@@ -99,28 +106,14 @@ int Application::init()
 	m_shader->setUniformVec3f("uBackgroundColor", glm::vec3(0.15f));
 
 
-	m_shader->setUniformVec3f("uSpheres[0].center", glm::vec3(0, 0, 0));
-	m_shader->setUniform1f("uSpheres[0].radius", 1.f);
-	m_shader->setUniformVec3f("uSpheres[0].color", glm::vec3(1.0, 0, 0));
+	
 
-	m_shader->setUniformVec3f("uSpheres[1].center", glm::vec3(1.5, 0, 0));
-	m_shader->setUniform1f("uSpheres[1].radius", 0.5f);
-	m_shader->setUniformVec3f("uSpheres[1].color", glm::vec3(0.1, 1, 0.1));
+	m_shader->setUniform1i("uSphereCount", m_spheres.size());
 
-	m_shader->setUniform1i("uSphereCount", 2);
-
-	m_shader->setUniformVec3f("uBoxes[0].position", glm::vec3(0, -2, 0));
-	m_shader->setUniformVec3f("uBoxes[0].b", glm::vec3(2, 1, 1));
-	m_shader->setUniform1f("uBoxes[0].r", 0.1f);
-	m_shader->setUniformVec3f("uBoxes[0].color", glm::vec3(1.0, 1.0, 0));
-
-	m_shader->setUniformVec3f("uBoxes[1].position", glm::vec3(0, 2, 0));
-	m_shader->setUniformVec3f("uBoxes[1].b", glm::vec3(1, 0.5, 1));
-	m_shader->setUniform1f("uBoxes[1].r", 0.1f);
-	m_shader->setUniformVec3f("uBoxes[1].color", glm::vec3(0.1, 0.1, 1.0));
+	
 
 
-	m_shader->setUniform1i("uBoxCount", 2);
+	m_shader->setUniform1i("uBoxCount", m_boxes.size());
 
 	// Enable depth 
 	glEnable(GL_DEPTH_TEST);
@@ -155,6 +148,21 @@ void Application::update()
 	m_shader->setUniformMat4f("uInverseViewProj", glm::inverse(m_camera->getProjectionMatrix() * m_camera->getViewMatrix()));
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
 
+	for (int i = 0; i < m_spheres.size(); i++)
+	{
+		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].center", m_spheres[i].center);
+		m_shader->setUniform1f("uSpheres["+ std::to_string(i)+"].radius", m_spheres[i].radius);
+		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].color", m_spheres[i].color);
+	}
+
+	for (int i = 0; i < m_boxes.size(); i++)
+	{
+		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].position", m_boxes[i].position);
+		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].b", m_boxes[i].b);
+		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].r", m_boxes[i].r);
+		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].color", m_boxes[i].color);
+	}
+
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
 }
 
@@ -177,7 +185,40 @@ void Application::updateUI()
 	ImGui::SetNextWindowSize(ImVec2(450, 500), ImGuiCond_FirstUseEver);
 	ImGui::SetWindowCollapsed(false, ImGuiCond_FirstUseEver);
 	ImGui::Begin("Scene Editor");
-	//todo
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+	int i = 1;
+	for (auto& sphere : m_spheres)
+	{
+		std::string name = "Sphere " + std::to_string(i++);
+		if (ImGui::TreeNode(name.c_str()))
+		{
+			ImGui::DragFloat3("Position", glm::value_ptr(sphere.center), .1f);
+			ImGui::DragFloat("Radius", &sphere.radius, 0.1f);
+			if (ImGui::TreeNode("Color"))
+			{
+				ImGui::ColorPicker3("Color", glm::value_ptr(sphere.color));
+				ImGui::TreePop();
+			}
+			ImGui::TreePop();
+		}
+	}
+	i = 1;
+	for (auto& box : m_boxes)
+	{
+		std::string name = "Box " + std::to_string(i++);
+		if (ImGui::TreeNode(name.c_str()))
+		{
+			ImGui::DragFloat3("Position", glm::value_ptr(box.position), .1f);
+			ImGui::DragFloat3("Half-Size", glm::value_ptr(box.b), .1f);
+			ImGui::DragFloat("Radius", &box.r, 0.1f);
+			if (ImGui::TreeNode("Color"))
+			{
+				ImGui::ColorPicker3("Color", glm::value_ptr(box.color));
+				ImGui::TreePop();
+			}
+			ImGui::TreePop();
+		}
+	}
 	ImGui::End();
 
 }

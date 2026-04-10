@@ -9,6 +9,28 @@ constexpr int window_height = 1080;
 
 class Shader;
 
+struct Plane
+{
+	glm::vec3 n;
+	float d;
+	glm::vec3 color;
+};
+
+struct Sphere
+{
+	glm::vec3 center;
+	float radius;
+	glm::vec3 color;
+};
+
+struct Box
+{
+	glm::vec3 position;
+	glm::vec3 b;
+	float r;
+	glm::vec3 color;
+};
+
 class Application
 {
 public:
@@ -45,7 +67,8 @@ private:
 	float m_lastFrame = 0.0f;
 	float m_currentFrame = 0.0f;
 
-	
+	std::vector<Sphere> m_spheres;
+	std::vector<Box> m_boxes;
 
 
 	void onPressedKey(int key, const std::function<void()>& callback);

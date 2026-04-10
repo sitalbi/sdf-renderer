@@ -6,6 +6,12 @@ struct HitSurface
     vec3 color;
 };
 
+struct Plane 
+{
+    vec3 n;
+    float d;
+};
+
 struct Sphere
 {
     vec3 center;
@@ -13,8 +19,19 @@ struct Sphere
     vec3 color;
 };
 
+struct Box
+{
+    vec3 position;
+    vec3 b;
+    float r;
+    vec3 color;
+};
+
 uniform Sphere uSpheres[64];
 uniform int uSphereCount;
+
+uniform Box uBoxes[64];
+uniform int uBoxCount;
 
 uniform vec3 uLightPosition;
 
@@ -36,19 +53,54 @@ float sdSphere(vec3 position, vec3 center, float radius)
     return length(position - center) - radius;
 }
 
+float sdRoundBox(vec3 position, vec3 p, vec3 b, float r )
+{
+    
+  vec3 q = abs(position-p) - b + r;
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
+}
+
+HitSurface opUnion(HitSurface a, HitSurface b)
+{
+    return (a.dist < b.dist) ? a : b;
+}
+
+HitSurface opIntersection(HitSurface a, HitSurface b)
+{
+    return (a.dist > b.dist) ? a : b;
+}
+
+HitSurface opSmoothUnion(HitSurface a, HitSurface b, float k ) 
+{
+    HitSurface hit;
+    float h = clamp( 0.5 + 0.5*(b.dist-a.dist)/k, 0.0, 1.0 );
+    hit.dist = mix(b.dist, a.dist, h ) - k*h*(1.0-h);
+    hit.color = mix(b.color, a.color, h );
+    return hit;
+}
+
 HitSurface sdScene(vec3 position)
 {
     HitSurface hit;
     hit.dist = 1e20;
     for (int i = 0; i < uSphereCount; ++i)
     {
-        float d = sdSphere(position, uSpheres[i].center, uSpheres[i].radius);
-        if(d<hit.dist)
-        {
-            hit.dist = d;
-            hit.color = uSpheres[i].color;
-        }
+        HitSurface sphereHit;
+        sphereHit.dist = sdSphere(position, uSpheres[i].center, uSpheres[i].radius);
+        sphereHit.color = uSpheres[i].color;
+
+        hit = opSmoothUnion(hit, sphereHit,0.5);
     }
+
+    for (int i = 0; i < uBoxCount; ++i)
+    {
+        HitSurface boxHit;
+        boxHit.dist = sdRoundBox(position, uBoxes[i].position, uBoxes[i].b, uBoxes[i].r);
+        boxHit.color = uBoxes[i].color;
+
+        hit = opSmoothUnion(hit, boxHit, 0.5);
+    }
+
     return hit;
 }
 
@@ -112,7 +164,7 @@ void main()
         vec3 n = getNormal(p);
         vec3 lightDir = normalize(uLightPosition - p);
         float diffuse = clamp(dot(n, lightDir), 0.0, 1.0);
-        float ambient = 0.3;
+        float ambient = 0.2;
 
         vec3 color = (diffuse + ambient) * hit.color;
         FragColor = vec4(color, 1.0);

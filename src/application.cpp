@@ -8,8 +8,10 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
 #include <glm/gtc/type_ptr.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 
 
@@ -87,6 +89,18 @@ int Application::init()
 
 	m_camera = new Camera(window_width, window_height, glm::vec3(0, 1, 0), 90.f, 0.f);
 
+	std::array<std::string, 6> faces =
+	{
+		RES_DIR"/textures/skybox/skybox_rt.png",
+		RES_DIR"/textures/skybox/skybox_lf.png",
+		RES_DIR"/textures/skybox/skybox_up.png",
+		RES_DIR"/textures/skybox/skybox_dn.png",
+		RES_DIR"/textures/skybox/skybox_bk.png",
+		RES_DIR"/textures/skybox/skybox_ft.png",
+	};
+
+	m_skyboxTexture = loadCubemap(faces);
+
 	setCallbacks();
 
 	m_spheres.push_back({ glm::vec3(0, 0, 0), 1.f,glm::vec3(1.0, 0, 0) });
@@ -94,6 +108,8 @@ int Application::init()
 
 	m_boxes.push_back({ glm::vec3(0, -2, 0),glm::vec3(2, 1, 1), 0.1f, glm::vec3(1.0, 1.0, 0) });
 	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f, glm::vec3(0.1, 0.1, 1.0) });
+
+	//m_planes.push_back({ glm::vec3(0,1,0), 3, glm::vec3(1,0.3,0.3)});
 
 	// Create and compile our GLSL program from the shaders
 	m_shader = new Shader(RES_DIR "/shaders/default_vert.glsl", RES_DIR"/shaders/sdf_frag.glsl");
@@ -103,17 +119,12 @@ int Application::init()
 	m_shader->setUniformVec2f("uResolution", m_camera->getResolution());
 
 	m_shader->setUniformVec3f("uLightPosition", glm::vec3(5, 3, 0));
-	m_shader->setUniformVec3f("uBackgroundColor", glm::vec3(0.15f));
-
-
-	
+	//m_shader->setUniformVec3f("uBackgroundColor", glm::vec3(0.35f));
+	m_shader->setUniform1i("uSkybox", 0); // texture unit 0
 
 	m_shader->setUniform1i("uSphereCount", m_spheres.size());
-
-	
-
-
 	m_shader->setUniform1i("uBoxCount", m_boxes.size());
+	m_shader->setUniform1i("uPlaneCount", m_planes.size());
 
 	// Enable depth 
 	glEnable(GL_DEPTH_TEST);
@@ -121,6 +132,8 @@ int Application::init()
 
 	// Enable antialiasing
 	glEnable(GL_MULTISAMPLE);
+
+	
 
 	initUI();
 
@@ -145,6 +158,9 @@ void Application::update()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
+
 	m_shader->setUniformMat4f("uInverseViewProj", glm::inverse(m_camera->getProjectionMatrix() * m_camera->getViewMatrix()));
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
 
@@ -161,6 +177,13 @@ void Application::update()
 		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].b", m_boxes[i].b);
 		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].r", m_boxes[i].r);
 		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].color", m_boxes[i].color);
+	}
+
+	for (int i = 0; i < m_planes.size(); i++)
+	{
+		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].n", m_planes[i].n);
+		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].d", m_planes[i].d);
+		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].color", m_planes[i].color);
 	}
 
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
@@ -219,6 +242,23 @@ void Application::updateUI()
 			ImGui::TreePop();
 		}
 	}
+	i = 1;
+	for (auto& plane : m_planes)
+	{
+		std::string name = "Plane " + std::to_string(i++);
+		if (ImGui::TreeNode(name.c_str()))
+		{
+			ImGui::DragFloat3("Normal", glm::value_ptr(plane.n), .1f, 0, 1);
+			ImGui::DragFloat("Offset", &plane.d, .1f);
+			if (ImGui::TreeNode("Color"))
+			{
+				ImGui::ColorPicker3("Color", glm::value_ptr(plane.color));
+				ImGui::TreePop();
+			}
+			ImGui::TreePop();
+		}
+	}
+
 	ImGui::End();
 
 }
@@ -327,4 +367,59 @@ void Application::onPressedKey(int key, const std::function<void()>& callback)
 	}
 	m_keyStates[key] = isPressed;
 
+}
+
+unsigned int Application::loadCubemap(const std::array<std::string, 6>& faces)
+{
+	unsigned int textureID = 0;
+	glGenTextures(1, &textureID);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+	stbi_set_flip_vertically_on_load(false);
+
+	int width = 0;
+	int height = 0;
+	int channels = 0;
+
+	for (unsigned int i = 0; i < faces.size(); ++i)
+	{
+		unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &channels, 0);
+		if (!data)
+		{
+			std::cerr << "Failed to load cubemap face: " << faces[i] << std::endl;
+			stbi_image_free(data);
+			glDeleteTextures(1, &textureID);
+			return 0;
+		}
+
+		GLenum format = GL_RGB;
+		if (channels == 1) format = GL_RED;
+		else if (channels == 3) format = GL_RGB;
+		else if (channels == 4) format = GL_RGBA;
+
+		glTexImage2D(
+			GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+			0,
+			format,
+			width,
+			height,
+			0,
+			format,
+			GL_UNSIGNED_BYTE,
+			data
+		);
+
+		stbi_image_free(data);
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	return textureID;
 }

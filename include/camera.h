@@ -66,8 +66,8 @@ private:
 	float m_pitch;
 	float m_fov = 60.0f;
 
-	float m_farClippingPlane = 300.0;
-	float m_nearClippingPlane = 0.1f;
+	float m_farClippingPlane = 600.f;
+	float m_nearClippingPlane = 0.5f;
 
 	float m_speed = 3.0f;
 

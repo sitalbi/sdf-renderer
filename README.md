@@ -4,6 +4,6 @@ Simple SDF (Signed Distance Fields) raymarching renderer.
 
 ## TODO:
 
-- add plane
-- add skybox
+- implement shadows
 - add create/destroy shapes
+- implement anti-aliasing (try various approach)

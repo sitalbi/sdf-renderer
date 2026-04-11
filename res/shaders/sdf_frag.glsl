@@ -10,6 +10,7 @@ struct Plane
 {
     vec3 n;
     float d;
+    vec3 color;
 };
 
 struct Sphere
@@ -33,9 +34,13 @@ uniform int uSphereCount;
 uniform Box uBoxes[64];
 uniform int uBoxCount;
 
+uniform Plane uPlanes[64];
+uniform int uPlaneCount;
+
 uniform vec3 uLightPosition;
 
 uniform vec3 uBackgroundColor;
+uniform samplerCube uSkybox;
 
 uniform vec2 uResolution;
 
@@ -46,7 +51,12 @@ out vec4 FragColor;
 
 const int MAX_STEPS = 100;
 const float MAX_DIST = 100.0;
-const float EPSILON = 0.001;
+const float EPSILON = 0.01;
+
+float sdPlane(vec3 p, vec3 n, float h)
+{
+    return dot(p,n) + h;
+}
 
 float sdSphere(vec3 position, vec3 center, float radius)
 {
@@ -99,6 +109,15 @@ HitSurface sdScene(vec3 position)
         boxHit.color = uBoxes[i].color;
 
         hit = opSmoothUnion(hit, boxHit, 0.5);
+    }
+
+    for (int i = 0; i < uPlaneCount; ++i)
+    {
+        HitSurface planeHit;
+        planeHit.dist = sdPlane(position, uPlanes[i].n, uPlanes[i].d);
+        planeHit.color = uPlanes[i].color;
+
+        hit = opUnion(hit, planeHit);
     }
 
     return hit;
@@ -171,6 +190,6 @@ void main()
     }
     else
     {
-        FragColor = vec4(uBackgroundColor, 1.0);
+        FragColor = vec4(texture(uSkybox, rd).rgb, 1.0);
     }
 }

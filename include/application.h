@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "camera.h"
 #include <glad/glad.h>
 #include "GLFW/glfw3.h"
@@ -69,7 +71,12 @@ private:
 
 	std::vector<Sphere> m_spheres;
 	std::vector<Box> m_boxes;
+	std::vector<Plane> m_planes;
+
+	unsigned int m_skyboxTexture;
 
 
 	void onPressedKey(int key, const std::function<void()>& callback);
+
+	unsigned int loadCubemap(const std::array<std::string, 6>& faces);
 };

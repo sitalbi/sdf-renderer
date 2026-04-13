@@ -151,6 +151,37 @@ HitSurface raymarch(vec3 ro, vec3 rd)
     return hit;
 }
 
+// Simpler raymarch function for shadow
+// from: https://iquilezles.org/articles/rmshadows/
+float shadowRay(vec3 ro, vec3 rd, float maxDist, float k)
+{
+    float t = 0.1;
+    //float pd = 1e20;
+    float result = 1.0;
+
+    for (int i = 0; i < 64; ++i)
+    {
+        vec3 p = ro + rd * t;
+        float d = sdScene(p).dist;
+
+        if (d < 0.001)
+            return 0.0;
+
+//        float y = d*d/(2.0*pd);
+//        float dd = sqrt(d*d-y*y);
+//        result = min(result, dd/(k*max(0.0,t-y)));
+//        pd = d;
+
+        result = min( result, k*d/t );
+        t += d;
+
+        if (t >= maxDist)
+            break;
+    }
+
+    return clamp(result, 0.0, 1.0);
+}
+
 vec3 getNormal(vec3 p)
 {
     float e = 0.001;
@@ -181,8 +212,15 @@ void main()
     {
         vec3 p = ro + rd * hit.dist;
         vec3 n = getNormal(p);
-        vec3 lightDir = normalize(uLightPosition - p);
-        float diffuse = clamp(dot(n, lightDir), 0.0, 1.0);
+
+        vec3 toLight = uLightPosition - p;
+        float lightDist = length(toLight);
+        vec3 lightDir = normalize(toLight);
+
+        // Raymarch from the fragment to the light position to check obstruction for shadow
+        float shadow = shadowRay(p + n * 0.01, lightDir, lightDist, 64);
+
+        float diffuse = clamp(dot(n, lightDir), 0.0, 1.0) * shadow;
         float ambient = 0.2;
 
         vec3 color = (diffuse + ambient) * hit.color;

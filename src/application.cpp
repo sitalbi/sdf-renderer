@@ -108,8 +108,11 @@ int Application::init()
 
 	m_boxes.push_back({ glm::vec3(0, -2, 0),glm::vec3(2, 1, 1), 0.1f, glm::vec3(1.0, 1.0, 0) });
 	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f, glm::vec3(0.1, 0.1, 1.0) });
+	m_boxes.push_back({ glm::vec3(0, -4, 0),glm::vec3(20, 0.1, 20), 0.1f, glm::vec3(0.8, 0.8, 0.8) });
 
 	//m_planes.push_back({ glm::vec3(0,1,0), 3, glm::vec3(1,0.3,0.3)});
+
+	m_lightPosition = glm::vec3(10, 5, 0);
 
 	// Create and compile our GLSL program from the shaders
 	m_shader = new Shader(RES_DIR "/shaders/default_vert.glsl", RES_DIR"/shaders/sdf_frag.glsl");
@@ -118,13 +121,9 @@ int Application::init()
 
 	m_shader->setUniformVec2f("uResolution", m_camera->getResolution());
 
-	m_shader->setUniformVec3f("uLightPosition", glm::vec3(5, 3, 0));
-	//m_shader->setUniformVec3f("uBackgroundColor", glm::vec3(0.35f));
-	m_shader->setUniform1i("uSkybox", 0); // texture unit 0
+	m_shader->setUniform1i("uSkybox", 0);
 
-	m_shader->setUniform1i("uSphereCount", m_spheres.size());
-	m_shader->setUniform1i("uBoxCount", m_boxes.size());
-	m_shader->setUniform1i("uPlaneCount", m_planes.size());
+	
 
 	// Enable depth 
 	glEnable(GL_DEPTH_TEST);
@@ -132,8 +131,6 @@ int Application::init()
 
 	// Enable antialiasing
 	glEnable(GL_MULTISAMPLE);
-
-	
 
 	initUI();
 
@@ -161,8 +158,12 @@ void Application::update()
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
 
+	m_shader->setUniformVec3f("uLightPosition", m_lightPosition);
 	m_shader->setUniformMat4f("uInverseViewProj", glm::inverse(m_camera->getProjectionMatrix() * m_camera->getViewMatrix()));
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
+	m_shader->setUniform1i("uSphereCount", m_spheres.size());
+	m_shader->setUniform1i("uBoxCount", m_boxes.size());
+	m_shader->setUniform1i("uPlaneCount", m_planes.size());
 
 	for (int i = 0; i < m_spheres.size(); i++)
 	{
@@ -208,57 +209,107 @@ void Application::updateUI()
 	ImGui::SetNextWindowSize(ImVec2(450, 500), ImGuiCond_FirstUseEver);
 	ImGui::SetWindowCollapsed(false, ImGuiCond_FirstUseEver);
 	ImGui::Begin("Scene Editor");
+	ImGui::SeparatorText("Shapes");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-	int i = 1;
-	for (auto& sphere : m_spheres)
+
+	for (int i = 0; i < (int)m_spheres.size(); ++i)
 	{
-		std::string name = "Sphere " + std::to_string(i++);
+		auto& sphere = m_spheres[i];
+		std::string name = "Sphere " + std::to_string(i + 1);
+
+		ImGui::PushID(i);
+
 		if (ImGui::TreeNode(name.c_str()))
 		{
-			ImGui::DragFloat3("Position", glm::value_ptr(sphere.center), .1f);
+			ImGui::DragFloat3("Position", glm::value_ptr(sphere.center), 0.1f);
 			ImGui::DragFloat("Radius", &sphere.radius, 0.1f);
+
 			if (ImGui::TreeNode("Color"))
 			{
 				ImGui::ColorPicker3("Color", glm::value_ptr(sphere.color));
 				ImGui::TreePop();
 			}
+
+			if (ImGui::Button("Delete"))
+			{
+				m_spheres.erase(m_spheres.begin() + i);
+				ImGui::TreePop();
+				ImGui::PopID();
+				break;
+			}
+
 			ImGui::TreePop();
 		}
+
+		ImGui::PopID();
 	}
-	i = 1;
-	for (auto& box : m_boxes)
+	for (int i = 0; i < (int)m_boxes.size(); ++i)
 	{
-		std::string name = "Box " + std::to_string(i++);
+		auto& box = m_boxes[i];
+		std::string name = "Box " + std::to_string(i + 1);
+
+		ImGui::PushID(i);
+
 		if (ImGui::TreeNode(name.c_str()))
 		{
-			ImGui::DragFloat3("Position", glm::value_ptr(box.position), .1f);
-			ImGui::DragFloat3("Half-Size", glm::value_ptr(box.b), .1f);
+			ImGui::DragFloat3("Position", glm::value_ptr(box.position), 0.1f);
+			ImGui::DragFloat3("Half-Size", glm::value_ptr(box.b), 0.1f);
 			ImGui::DragFloat("Radius", &box.r, 0.1f);
+
 			if (ImGui::TreeNode("Color"))
 			{
 				ImGui::ColorPicker3("Color", glm::value_ptr(box.color));
 				ImGui::TreePop();
 			}
+
+			if (ImGui::Button("Delete"))
+			{
+				m_boxes.erase(m_boxes.begin() + i);
+				ImGui::TreePop();
+				ImGui::PopID();
+				break;
+			}
+
 			ImGui::TreePop();
 		}
+
+		ImGui::PopID();
 	}
-	i = 1;
-	for (auto& plane : m_planes)
+	for (int i = 0; i < (int)m_planes.size(); ++i)
 	{
-		std::string name = "Plane " + std::to_string(i++);
+		auto& plane = m_planes[i];
+		std::string name = "Plane " + std::to_string(i + 1);
+
+		ImGui::PushID(i);
+
 		if (ImGui::TreeNode(name.c_str()))
 		{
-			ImGui::DragFloat3("Normal", glm::value_ptr(plane.n), .1f, 0, 1);
-			ImGui::DragFloat("Offset", &plane.d, .1f);
+			ImGui::DragFloat3("Normal", glm::value_ptr(plane.n), 0.1f, 0.0f, 1.0f);
+			ImGui::DragFloat("Offset", &plane.d, 0.1f);
+
 			if (ImGui::TreeNode("Color"))
 			{
 				ImGui::ColorPicker3("Color", glm::value_ptr(plane.color));
 				ImGui::TreePop();
 			}
+
+			if (ImGui::Button("Delete"))
+			{
+				m_planes.erase(m_planes.begin() + i);
+				ImGui::TreePop();
+				ImGui::PopID();
+				break;
+			}
+
 			ImGui::TreePop();
 		}
+
+		ImGui::PopID();
 	}
 
+	ImGui::SeparatorText("Light");
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+	ImGui::DragFloat3("Position", glm::value_ptr(m_lightPosition), 0.1f);
 	ImGui::End();
 
 }
@@ -315,6 +366,10 @@ void Application::processInput()
 	}
 
 
+	onPressedKey(GLFW_KEY_2, [&]() {
+		createSphere(m_camera->getPosition() + m_camera->getForward() * 3.0f);
+	});
+
 	// if wasd keys are pressed, move the camera
 	if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) {
 		m_camera->moveForward(m_deltaTime);
@@ -366,7 +421,6 @@ void Application::onPressedKey(int key, const std::function<void()>& callback)
 		callback();
 	}
 	m_keyStates[key] = isPressed;
-
 }
 
 unsigned int Application::loadCubemap(const std::array<std::string, 6>& faces)
@@ -422,4 +476,9 @@ unsigned int Application::loadCubemap(const std::array<std::string, 6>& faces)
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
 	return textureID;
+}
+
+void Application::createSphere(glm::vec3 pos)
+{
+	m_spheres.push_back({ pos, 1.0, glm::vec3(1.0) });
 }

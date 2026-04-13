@@ -73,10 +73,14 @@ private:
 	std::vector<Box> m_boxes;
 	std::vector<Plane> m_planes;
 
+	glm::vec3 m_lightPosition;
+
 	unsigned int m_skyboxTexture;
 
 
 	void onPressedKey(int key, const std::function<void()>& callback);
 
 	unsigned int loadCubemap(const std::array<std::string, 6>& faces);
+	
+	void createSphere(glm::vec3 pos);
 };

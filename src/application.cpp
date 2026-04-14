@@ -108,9 +108,7 @@ int Application::init()
 
 	m_boxes.push_back({ glm::vec3(0, -2, 0),glm::vec3(2, 1, 1), 0.1f, glm::vec3(1.0, 1.0, 0) });
 	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f, glm::vec3(0.1, 0.1, 1.0) });
-	m_boxes.push_back({ glm::vec3(0, -4, 0),glm::vec3(20, 0.1, 20), 0.1f, glm::vec3(0.8, 0.8, 0.8) });
-
-	//m_planes.push_back({ glm::vec3(0,1,0), 3, glm::vec3(1,0.3,0.3)});
+	m_boxes.push_back({ glm::vec3(0, -4, 0),glm::vec3(20, 0.1, 20), 0.1f, glm::vec3(0.8, 0.8, 0.8), 1 });
 
 	m_lightPosition = glm::vec3(10, 5, 0);
 
@@ -170,6 +168,7 @@ void Application::update()
 		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].center", m_spheres[i].center);
 		m_shader->setUniform1f("uSpheres["+ std::to_string(i)+"].radius", m_spheres[i].radius);
 		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].color", m_spheres[i].color);
+		m_shader->setUniform1i("uSpheres["+ std::to_string(i)+"].tex", m_spheres[i].texture);
 	}
 
 	for (int i = 0; i < m_boxes.size(); i++)
@@ -178,6 +177,7 @@ void Application::update()
 		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].b", m_boxes[i].b);
 		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].r", m_boxes[i].r);
 		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].color", m_boxes[i].color);
+		m_shader->setUniform1i("uBoxes[" + std::to_string(i) + "].tex", m_boxes[i].texture);
 	}
 
 	for (int i = 0; i < m_planes.size(); i++)
@@ -185,6 +185,7 @@ void Application::update()
 		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].n", m_planes[i].n);
 		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].d", m_planes[i].d);
 		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].color", m_planes[i].color);
+		m_shader->setUniform1i("uPlanes[" + std::to_string(i) + "].tex", m_planes[i].texture);
 	}
 
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);

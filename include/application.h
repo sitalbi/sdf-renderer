@@ -16,6 +16,7 @@ struct Plane
 	glm::vec3 n;
 	float d;
 	glm::vec3 color;
+	int texture = 0;
 };
 
 struct Sphere
@@ -23,6 +24,7 @@ struct Sphere
 	glm::vec3 center;
 	float radius;
 	glm::vec3 color;
+	int texture = 0;
 };
 
 struct Box
@@ -31,6 +33,7 @@ struct Box
 	glm::vec3 b;
 	float r;
 	glm::vec3 color;
+	int texture = 0;
 };
 
 class Application

@@ -4,6 +4,7 @@ struct HitSurface
 {
     float dist;
     vec3 color;
+    int tex;
 };
 
 struct Plane 
@@ -11,6 +12,7 @@ struct Plane
     vec3 n;
     float d;
     vec3 color;
+    int tex;
 };
 
 struct Sphere
@@ -18,6 +20,7 @@ struct Sphere
     vec3 center;
     float radius;
     vec3 color;
+    int tex;
 };
 
 struct Box
@@ -26,6 +29,7 @@ struct Box
     vec3 b;
     float r;
     vec3 color;
+    int tex;
 };
 
 uniform Sphere uSpheres[64];
@@ -86,6 +90,7 @@ HitSurface opSmoothUnion(HitSurface a, HitSurface b, float k )
     float h = clamp( 0.5 + 0.5*(b.dist-a.dist)/k, 0.0, 1.0 );
     hit.dist = mix(b.dist, a.dist, h ) - k*h*(1.0-h);
     hit.color = mix(b.color, a.color, h );
+    hit.tex = (h>0.5) ? a.tex : b.tex;
     return hit;
 }
 
@@ -98,6 +103,7 @@ HitSurface sdScene(vec3 position)
         HitSurface sphereHit;
         sphereHit.dist = sdSphere(position, uSpheres[i].center, uSpheres[i].radius);
         sphereHit.color = uSpheres[i].color;
+        sphereHit.tex = uSpheres[i].tex;
 
         hit = opSmoothUnion(hit, sphereHit,0.5);
     }
@@ -107,6 +113,7 @@ HitSurface sdScene(vec3 position)
         HitSurface boxHit;
         boxHit.dist = sdRoundBox(position, uBoxes[i].position, uBoxes[i].b, uBoxes[i].r);
         boxHit.color = uBoxes[i].color;
+        boxHit.tex = uBoxes[i].tex;
 
         hit = opSmoothUnion(hit, boxHit, 0.5);
     }
@@ -116,6 +123,7 @@ HitSurface sdScene(vec3 position)
         HitSurface planeHit;
         planeHit.dist = sdPlane(position, uPlanes[i].n, uPlanes[i].d);
         planeHit.color = uPlanes[i].color;
+        planeHit.tex = uPlanes[i].tex;
 
         hit = opUnion(hit, planeHit);
     }
@@ -174,7 +182,7 @@ float shadowRay(vec3 ro, vec3 rd, float maxDist, float k)
 
         result = min( result, k*d/t );
         t += d;
-
+         
         if (t >= maxDist)
             break;
     }
@@ -192,6 +200,12 @@ vec3 getNormal(vec3 p)
         sdScene(p + vec3(h.y, h.x, h.y)).dist - sdScene(p - vec3(h.y, h.x, h.y)).dist,
         sdScene(p + vec3(h.y, h.y, h.x)).dist - sdScene(p - vec3(h.y, h.y, h.x)).dist
     ));
+}
+
+float checkerTexture(vec2 uv)
+{
+    vec2 c = floor(uv);
+    return mod(c.x + c.y, 2.0);
 }
 
 void main()
@@ -223,7 +237,15 @@ void main()
         float diffuse = clamp(dot(n, lightDir), 0.0, 1.0) * shadow;
         float ambient = 0.2;
 
-        vec3 color = (diffuse + ambient) * hit.color;
+        vec3 albedo = hit.color;
+
+        if (hit.tex == 1)
+        {
+            float pattern = checkerTexture(p.xz * 0.5);
+            albedo = mix(albedo, albedo * 0.75, pattern);
+        }
+
+        vec3 color = albedo * (diffuse + ambient);
         FragColor = vec4(color, 1.0);
     }
     else

@@ -38,6 +38,8 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 - implement reflections (skybox only first and maybe try recursive if perf ok)
 - pbr shading
 
+## Build Instructions
+
 ### Requirements
 
 - CMake ≥ 3.20  

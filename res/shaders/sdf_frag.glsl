@@ -50,6 +50,7 @@ uniform vec2 uResolution;
 
 uniform mat4 uInverseViewProj;
 uniform vec3 uCameraPos;
+uniform int uAA;
 
 out vec4 FragColor;
 
@@ -208,9 +209,9 @@ float checkerTexture(vec2 uv)
     return mod(c.x + c.y, 2.0);
 }
 
-void main()
+vec3 renderSample(vec2 fragCoord)
 {
-    vec2 uv = (gl_FragCoord.xy / uResolution) * 2.0 - 1.0;
+    vec2 uv = (fragCoord / uResolution) * 2.0 - 1.0;
 
     vec4 clip = vec4(uv, 1.0, 1.0);
     vec4 world = uInverseViewProj * clip;
@@ -219,8 +220,7 @@ void main()
     vec3 ro = uCameraPos;
     vec3 rd = normalize(world.xyz - ro);
 
-
-	HitSurface hit = raymarch(ro, rd);
+    HitSurface hit = raymarch(ro, rd);
 
     if (hit.dist > 0.0)
     {
@@ -231,25 +231,46 @@ void main()
         float lightDist = length(toLight);
         vec3 lightDir = normalize(toLight);
 
-        // Raymarch from the fragment to the light position to check obstruction for shadow
-        float shadow = shadowRay(p + n * 0.01, lightDir, lightDist, 64);
-
-        float diffuse = clamp(dot(n, lightDir), 0.0, 1.0) * shadow;
+        float shadow = shadowRay(p + n * 0.01, lightDir, lightDist, 64.0);
+        float diffuse = max(dot(n, lightDir), 0.0) * shadow;
         float ambient = 0.2;
 
         vec3 albedo = hit.color;
 
-        if (hit.tex == 1)
-        {
-            float pattern = checkerTexture(p.xz * 0.5);
-            albedo = mix(albedo, albedo * 0.75, pattern);
-        }
+        float pattern = checkerTexture(p.xz * 0.5);
+        vec3 checkerAlbedo = mix(albedo, albedo * 0.75, pattern);
+        albedo = mix(albedo, checkerAlbedo, hit.tex);
 
-        vec3 color = albedo * (diffuse + ambient);
-        FragColor = vec4(color, 1.0);
+        return albedo * (diffuse + ambient);
     }
     else
     {
-        FragColor = vec4(texture(uSkybox, rd).rgb, 1.0);
+        return texture(uSkybox, rd).rgb;
     }
+}
+
+void main()
+{
+    vec3 color = vec3(0.0);
+    if(uAA == 1)
+    {
+        // 2Å~2 SSAA
+        vec2 offsets[4] = vec2[](
+            vec2(-0.25, -0.25),
+            vec2( 0.25, -0.25),
+            vec2(-0.25,  0.25),
+            vec2( 0.25,  0.25)
+        );
+
+        for (int i = 0; i < 4; ++i)
+        {
+            color += renderSample(gl_FragCoord.xy + offsets[i]);
+        }
+        color *= 0.25;
+    } 
+    else 
+    {
+        color = renderSample(gl_FragCoord.xy);
+    }
+    FragColor = vec4(color, 1.0);
 }

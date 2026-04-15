@@ -156,9 +156,12 @@ void Application::update()
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, m_skyboxTexture);
 
+	m_shader->setUniformVec2f("uResolution", m_camera->getResolution());
 	m_shader->setUniformVec3f("uLightPosition", m_lightPosition);
 	m_shader->setUniformMat4f("uInverseViewProj", glm::inverse(m_camera->getProjectionMatrix() * m_camera->getViewMatrix()));
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
+	m_shader->setUniform1i("uAA", m_useAA);
+
 	m_shader->setUniform1i("uSphereCount", m_spheres.size());
 	m_shader->setUniform1i("uBoxCount", m_boxes.size());
 	m_shader->setUniform1i("uPlaneCount", m_planes.size());
@@ -311,6 +314,9 @@ void Application::updateUI()
 	ImGui::SeparatorText("Light");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::DragFloat3("Position", glm::value_ptr(m_lightPosition), 0.1f);
+	ImGui::SeparatorText("Settings");
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+	ImGui::Checkbox("Anti-Aliasing", &m_useAA);
 	ImGui::End();
 
 }
@@ -396,10 +402,18 @@ void Application::setCallbacks()
 {
 	glfwSetWindowUserPointer(m_window, m_camera);
 
+	// Mouse scroll
 	glfwSetScrollCallback(m_window, [](GLFWwindow* window, double xoffset, double yoffset) {
-			Camera* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
-			cam->scroll(yoffset);
-		});
+		Camera* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
+		cam->scroll(yoffset);
+	});
+
+	// Window resize (using framebuffer)
+	glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow* window, int width, int height) {
+		Camera* cam = static_cast<Camera*>(glfwGetWindowUserPointer(window));
+		glViewport(0, 0, width, height);
+		cam->setResolution(width, height);
+	});
 }
 
 

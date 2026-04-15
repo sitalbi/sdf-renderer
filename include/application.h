@@ -80,6 +80,8 @@ private:
 
 	unsigned int m_skyboxTexture;
 
+	bool m_useAA = false;
+
 
 	void onPressedKey(int key, const std::function<void()>& callback);
 

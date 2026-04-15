@@ -46,6 +46,7 @@ public:
 	void scroll(float yoffset);
 
 	void setSpeed(float offset);
+	void setResolution(int width, int height);
 
 	double lastX;
 	double lastY;

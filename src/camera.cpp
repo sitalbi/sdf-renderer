@@ -65,6 +65,12 @@ void Camera::setSpeed(float offset)
 	if (m_speed > 100.0f) m_speed = 100.0f;
 }
 
+void Camera::setResolution(int width, int height)
+{
+	m_width = width;
+	m_height = height;
+}
+
 void Camera::moveForward(float deltaTime)
 {
 	m_position += m_forward * m_speed * deltaTime;

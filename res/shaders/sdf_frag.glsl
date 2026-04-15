@@ -85,6 +85,7 @@ HitSurface opIntersection(HitSurface a, HitSurface b)
     return (a.dist > b.dist) ? a : b;
 }
 
+
 HitSurface opSmoothUnion(HitSurface a, HitSurface b, float k ) 
 {
     HitSurface hit;

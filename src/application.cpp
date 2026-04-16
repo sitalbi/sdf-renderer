@@ -110,6 +110,13 @@ int Application::init()
 	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f, glm::vec3(0.1, 0.1, 1.0) });
 	m_boxes.push_back({ glm::vec3(0, -4, 0),glm::vec3(20, 0.1, 20), 0.1f, glm::vec3(0.8, 0.8, 0.8), 1 });
 
+	m_sceneOps.clear();
+	m_sceneOps.push_back({ SHAPE_SPHERE, 0, OP_UNION});
+	m_sceneOps.push_back({ SHAPE_SPHERE, 1, OP_SMOOTH_UNION});
+	m_sceneOps.push_back({ SHAPE_BOX,    0, OP_SMOOTH_UNION });
+	m_sceneOps.push_back({ SHAPE_BOX,    1, OP_SMOOTH_UNION });
+	m_sceneOps.push_back({ SHAPE_BOX,    2, OP_SMOOTH_UNION });
+
 	m_lightPosition = glm::vec3(10, 5, 0);
 
 	// Create and compile our GLSL program from the shaders
@@ -162,9 +169,6 @@ void Application::update()
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
 	m_shader->setUniform1i("uAA", m_useAA);
 
-	m_shader->setUniform1i("uSphereCount", m_spheres.size());
-	m_shader->setUniform1i("uBoxCount", m_boxes.size());
-	m_shader->setUniform1i("uPlaneCount", m_planes.size());
 
 	for (int i = 0; i < m_spheres.size(); i++)
 	{
@@ -189,6 +193,15 @@ void Application::update()
 		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].d", m_planes[i].d);
 		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].color", m_planes[i].color);
 		m_shader->setUniform1i("uPlanes[" + std::to_string(i) + "].tex", m_planes[i].texture);
+	}
+
+	m_shader->setUniform1i("uSceneOpCount", m_sceneOps.size());
+
+	for (int i = 0; i < m_sceneOps.size(); ++i)
+	{
+		m_shader->setUniform1i("uSceneOps[" + std::to_string(i) + "].shapeType", m_sceneOps[i].shapeType);
+		m_shader->setUniform1i("uSceneOps[" + std::to_string(i) + "].shapeIndex", m_sceneOps[i].shapeIndex);
+		m_shader->setUniform1i("uSceneOps[" + std::to_string(i) + "].opType", m_sceneOps[i].opType);
 	}
 
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);

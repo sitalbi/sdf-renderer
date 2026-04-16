@@ -1,5 +1,14 @@
 #version 450 core
 
+const int SHAPE_SPHERE = 0;
+const int SHAPE_BOX    = 1;
+const int SHAPE_PLANE  = 2;
+
+const int OP_UNION        = 0;
+const int OP_SMOOTH_UNION = 1;
+const int OP_INTERSECTION = 2;
+const int OP_SUBTRACTION  = 3;
+
 struct HitSurface
 {
     float dist;
@@ -32,14 +41,21 @@ struct Box
     int tex;
 };
 
-uniform Sphere uSpheres[64];
-uniform int uSphereCount;
+struct SceneOp
+{
+    int shapeType;
+    int shapeIndex;
+    int opType;
+};
 
-uniform Box uBoxes[64];
-uniform int uBoxCount;
+uniform SceneOp uSceneOps[16];
+uniform int uSceneOpCount;
 
-uniform Plane uPlanes[64];
-uniform int uPlaneCount;
+uniform Sphere uSpheres[8];
+
+uniform Box uBoxes[8];
+
+uniform Plane uPlanes[8];
 
 uniform vec3 uLightPosition;
 
@@ -58,6 +74,8 @@ const int MAX_STEPS = 100;
 const float MAX_DIST = 100.0;
 const float EPSILON = 0.01;
 
+// Distance Functions
+
 float sdPlane(vec3 p, vec3 n, float h)
 {
     return dot(p,n) + h;
@@ -74,6 +92,36 @@ float sdRoundBox(vec3 position, vec3 p, vec3 b, float r )
   vec3 q = abs(position-p) - b + r;
   return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0) - r;
 }
+
+// Evaluate shape helper function
+HitSurface evalShape(vec3 position, int shapeType, int shapeIndex)
+{
+    HitSurface hit;
+
+    if (shapeType == SHAPE_SPHERE)
+    {
+        hit.dist = sdSphere(position, uSpheres[shapeIndex].center, uSpheres[shapeIndex].radius);
+        hit.color = uSpheres[shapeIndex].color;
+        hit.tex = uSpheres[shapeIndex].tex;
+        return hit;
+    }
+    else if (shapeType == SHAPE_BOX)
+    {
+        hit.dist = sdRoundBox(position, uBoxes[shapeIndex].position, uBoxes[shapeIndex].b, uBoxes[shapeIndex].r);
+        hit.color = uBoxes[shapeIndex].color;
+        hit.tex = uBoxes[shapeIndex].tex;
+        return hit;
+    }
+    else
+    {
+        hit.dist = sdPlane(position, uPlanes[shapeIndex].n, uPlanes[shapeIndex].d);
+        hit.color = uPlanes[shapeIndex].color;
+        hit.tex = uPlanes[shapeIndex].tex;
+        return hit;
+    }
+}
+
+// Operations
 
 HitSurface opUnion(HitSurface a, HitSurface b)
 {
@@ -96,38 +144,42 @@ HitSurface opSmoothUnion(HitSurface a, HitSurface b, float k )
     return hit;
 }
 
+HitSurface opSubtraction(HitSurface a, HitSurface b)
+{
+    HitSurface hit;
+    hit.dist = max(a.dist, -b.dist);
+    hit.color = a.color;
+    hit.tex = a.tex;
+    return hit;
+}
+
+HitSurface applyOp(HitSurface a, HitSurface b, int opType)
+{
+    if (opType == OP_UNION)        return opUnion(a, b);
+    if (opType == OP_SMOOTH_UNION) return opSmoothUnion(a, b, 0.5); // todo: configure the smooth factor (stop hardcoding 0.5)
+    if (opType == OP_INTERSECTION) return opIntersection(a, b);
+    if (opType == OP_SUBTRACTION)  return opSubtraction(a, b);
+    return opUnion(a, b);
+}
+
 HitSurface sdScene(vec3 position)
 {
     HitSurface hit;
     hit.dist = 1e20;
-    for (int i = 0; i < uSphereCount; ++i)
+    hit.color = vec3(0.0);
+    hit.tex = 0;
+
+    if (uSceneOpCount == 0)
+        return hit;
+
+    SceneOp first = uSceneOps[0];
+    hit = evalShape(position, first.shapeType, first.shapeIndex);
+
+    for (int i = 1; i < uSceneOpCount; ++i)
     {
-        HitSurface sphereHit;
-        sphereHit.dist = sdSphere(position, uSpheres[i].center, uSpheres[i].radius);
-        sphereHit.color = uSpheres[i].color;
-        sphereHit.tex = uSpheres[i].tex;
-
-        hit = opSmoothUnion(hit, sphereHit,0.5);
-    }
-
-    for (int i = 0; i < uBoxCount; ++i)
-    {
-        HitSurface boxHit;
-        boxHit.dist = sdRoundBox(position, uBoxes[i].position, uBoxes[i].b, uBoxes[i].r);
-        boxHit.color = uBoxes[i].color;
-        boxHit.tex = uBoxes[i].tex;
-
-        hit = opSmoothUnion(hit, boxHit, 0.5);
-    }
-
-    for (int i = 0; i < uPlaneCount; ++i)
-    {
-        HitSurface planeHit;
-        planeHit.dist = sdPlane(position, uPlanes[i].n, uPlanes[i].d);
-        planeHit.color = uPlanes[i].color;
-        planeHit.tex = uPlanes[i].tex;
-
-        hit = opUnion(hit, planeHit);
+        SceneOp entry = uSceneOps[i];
+        HitSurface next = evalShape(position, entry.shapeType, entry.shapeIndex);
+        hit = applyOp(hit, next, entry.opType);
     }
 
     return hit;

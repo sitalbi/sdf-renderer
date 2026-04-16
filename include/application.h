@@ -36,6 +36,28 @@ struct Box
 	int texture = 0;
 };
 
+enum ShapeType
+{
+	SHAPE_SPHERE = 0,
+	SHAPE_BOX = 1,
+	SHAPE_PLANE = 2
+};
+
+enum OpType
+{
+	OP_UNION = 0,
+	OP_SMOOTH_UNION = 1,
+	OP_INTERSECTION = 2,
+	OP_SUBTRACTION = 3
+};
+
+struct SceneOp
+{
+	int shapeType;
+	int shapeIndex;
+	int opType;
+};
+
 class Application
 {
 public:
@@ -75,6 +97,7 @@ private:
 	std::vector<Sphere> m_spheres;
 	std::vector<Box> m_boxes;
 	std::vector<Plane> m_planes;
+	std::vector<SceneOp> m_sceneOps;
 
 	glm::vec3 m_lightPosition;
 

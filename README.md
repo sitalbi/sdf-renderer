@@ -12,8 +12,7 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 ## Features
 
 - Raymarching-based rendering of Signed Distance Fields
-- Primitive support: spheres, rounded boxes
-  - planes
+- Primitive support: spheres, rounded boxes, planes
 - Scene composition using SDF operations
 - Skybox background
 - Basic ambient + diffuse lighting with soft shadows.
@@ -37,8 +36,6 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 - refactor to have non hardcoded configurable operations (unions, intersections, etc...)
 - implement reflections (skybox only first and maybe try recursive if perf ok)
 - pbr shading
-
-## Build Instructions
 
 ### Requirements
 

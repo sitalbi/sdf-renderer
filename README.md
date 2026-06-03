@@ -6,6 +6,7 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 ## Screenshots
 <p align="center">
  <img src="res/screenshots/screen1.png" width="650">
+	<br>
  <em>Smooth-unioned SDF primitives with soft shadows</em>
 </p>
 

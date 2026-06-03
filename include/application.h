@@ -56,7 +56,10 @@ struct SceneOp
 	int shapeType;
 	int shapeIndex;
 	int opType;
+	std::string name;
 };
+
+
 
 class Application
 {
@@ -70,6 +73,9 @@ public:
 	void update();
 	void updateUI();
 	void run();
+
+	void createShape(int shapeType, int opType);
+	void deleteShape(int shapeType, int shapeIndex, int sceneOpIndex);
 
 	void setCallbacks();
 	void processInput();
@@ -105,6 +111,24 @@ private:
 
 	bool m_useAA = false;
 
+	int m_maxSteps = 100;
+
+	// Shape defaults
+	glm::vec3 sphereCenter = glm::vec3(0.0f);
+	float sphereRadius = 1.0f;
+	glm::vec3 sphereColor = glm::vec3(1.0f, 0.0f, 0.0f);
+	int sphereTex = 0;
+
+	glm::vec3 boxPosition = glm::vec3(0.0f);
+	glm::vec3 boxHalfSize = glm::vec3(1.0f);
+	float boxRoundRadius = 0.1f;
+	glm::vec3 boxColor = glm::vec3(1.0f, 1.0f, 0.0f);
+	int boxTex = 0;
+
+	glm::vec3 planeNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+	float planeOffset = 0.0f;
+	glm::vec3 planeColor = glm::vec3(0.8f);
+	int planeTex = 0;
 
 	void onPressedKey(int key, const std::function<void()>& callback);
 

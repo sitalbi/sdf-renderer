@@ -68,11 +68,12 @@ uniform mat4 uInverseViewProj;
 uniform vec3 uCameraPos;
 uniform int uAA;
 
+uniform int MAX_STEPS = 100;
+uniform float MAX_DIST = 100.0;
+uniform float EPSILON = 0.01;
+
 out vec4 FragColor;
 
-const int MAX_STEPS = 100;
-const float MAX_DIST = 100.0;
-const float EPSILON = 0.01;
 
 // Distance Functions
 

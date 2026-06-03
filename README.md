@@ -28,12 +28,14 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 - W / A / S / D: move
 - Space / Left Shift: move up / down
 - Mouse Wheel: change movement speed
-- '2' key: create sphere
 
 
 ## TODO:
 
-- refactor to have non hardcoded configurable operations (unions, intersections, etc...)
+- performance optimizations:
+	- configurable max ray steps
+	- scene/object culling before evaluating SDFs
+	- bounding sphere or bounding box checks for primitives
 - implement reflections (skybox only first and maybe try recursive if perf ok)
 - pbr shading
 

@@ -30,12 +30,12 @@ Application::~Application()
 
 int Application::init()
 {
-	/* Initialize the library */
+	// Initialize the library 
 	if (!glfwInit())
 		return -1;
 
 
-	/* Create a windowed mode window and its OpenGL context */
+	// Create a windowed mode window and its OpenGL context
 	m_window = glfwCreateWindow(window_width, window_height, "SDF", NULL, NULL);
 	if (!m_window)
 	{
@@ -43,7 +43,7 @@ int Application::init()
 		return -1;
 	}
 
-	/* Make the window's context current */
+	// Make the window's context current
 	glfwMakeContextCurrent(m_window);
 
 	// Load OpenGL functions using glad
@@ -168,6 +168,7 @@ void Application::update()
 	m_shader->setUniformMat4f("uInverseViewProj", glm::inverse(m_camera->getProjectionMatrix() * m_camera->getViewMatrix()));
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
 	m_shader->setUniform1i("uAA", m_useAA);
+	m_shader->setUniform1i("MAX_STEPS", m_maxSteps);
 
 
 	for (int i = 0; i < m_spheres.size(); i++)
@@ -229,107 +230,210 @@ void Application::updateUI()
 	ImGui::SeparatorText("Shapes");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 
-	for (int i = 0; i < (int)m_spheres.size(); ++i)
+	for (int i = 0; i<m_sceneOps.size(); i++)
 	{
-		auto& sphere = m_spheres[i];
-		std::string name = "Sphere " + std::to_string(i + 1);
-
-		ImGui::PushID(i);
-
-		if (ImGui::TreeNode(name.c_str()))
+		auto& sceneOp = m_sceneOps[i];
+		switch (sceneOp.shapeType)
 		{
-			ImGui::DragFloat3("Position", glm::value_ptr(sphere.center), 0.1f);
-			ImGui::DragFloat("Radius", &sphere.radius, 0.1f);
+		case SHAPE_SPHERE:
+		{
+			auto& sphere = m_spheres[sceneOp.shapeIndex];
+			if (sceneOp.name == "") sceneOp.name = "Sphere " + std::to_string(sceneOp.shapeIndex + 1);
+			std::string& name = sceneOp.name;
 
-			if (ImGui::TreeNode("Color"))
+			ImGui::PushID(i);
+
+			if (ImGui::TreeNode(name.c_str()))
 			{
-				ImGui::ColorPicker3("Color", glm::value_ptr(sphere.color));
+				ImGui::DragFloat3("Position", glm::value_ptr(sphere.center), 0.1f);
+				ImGui::DragFloat("Radius", &sphere.radius, 0.1f);
+
+				if (ImGui::TreeNode("Color"))
+				{
+					ImGui::ColorPicker3("Color", glm::value_ptr(sphere.color));
+					ImGui::TreePop();
+				}
+
+				if (ImGui::Button("Delete"))
+				{
+					deleteShape(ShapeType::SHAPE_SPHERE, sceneOp.shapeIndex, i);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+
 				ImGui::TreePop();
 			}
 
-			if (ImGui::Button("Delete"))
+			ImGui::PopID();
+			break;
+		}
+		case SHAPE_BOX:
+		{
+			auto& box = m_boxes[sceneOp.shapeIndex];
+			if (sceneOp.name == "") sceneOp.name = "Box " + std::to_string(sceneOp.shapeIndex + 1);
+			std::string& name = sceneOp.name;
+
+			ImGui::PushID(sceneOp.shapeIndex);
+
+			if (ImGui::TreeNode(name.c_str()))
 			{
-				m_spheres.erase(m_spheres.begin() + i);
+				ImGui::DragFloat3("Position", glm::value_ptr(box.position), 0.1f);
+				ImGui::DragFloat3("Half-Size", glm::value_ptr(box.b), 0.1f);
+				ImGui::DragFloat("Radius", &box.r, 0.1f);
+
+				if (ImGui::TreeNode("Color"))
+				{
+					ImGui::ColorPicker3("Color", glm::value_ptr(box.color));
+					ImGui::TreePop();
+				}
+
+				if (ImGui::Button("Delete"))
+				{
+					deleteShape(ShapeType::SHAPE_BOX, sceneOp.shapeIndex, i);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+
 				ImGui::TreePop();
-				ImGui::PopID();
-				break;
 			}
 
-			ImGui::TreePop();
+			ImGui::PopID();
+			break;
+		}
+		case SHAPE_PLANE:
+		{
+			auto& plane = m_planes[sceneOp.shapeIndex];
+			if (sceneOp.name == "") sceneOp.name = "Plane " + std::to_string(sceneOp.shapeIndex + 1);
+			std::string& name = sceneOp.name;
+
+			ImGui::PushID(sceneOp.shapeIndex);
+
+			if (ImGui::TreeNode(name.c_str()))
+			{
+				ImGui::DragFloat3("Normal", glm::value_ptr(plane.n), 0.1f, 0.0f, 1.0f);
+				ImGui::DragFloat("Offset", &plane.d, 0.1f);
+
+				if (ImGui::TreeNode("Color"))
+				{
+					ImGui::ColorPicker3("Color", glm::value_ptr(plane.color));
+					ImGui::TreePop();
+				}
+
+				if (ImGui::Button("Delete"))
+				{
+					deleteShape(ShapeType::SHAPE_PLANE, sceneOp.shapeIndex, i);
+					ImGui::TreePop();
+					ImGui::PopID();
+					break;
+				}
+
+				ImGui::TreePop();
+			}
+
+			ImGui::PopID();
+			break;
+		}
+		default: break;
+		}
+	}
+
+
+	if (ImGui::Button("Add shape"))
+	{
+		ImGui::OpenPopup("Add Shape");
+	}
+
+	if (ImGui::BeginPopupModal("Add Shape", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		static int shapeType = SHAPE_SPHERE;
+		static int opType = OP_UNION;
+		static float smoothK = 0.5f;
+
+		ImGui::Text("Create new shape");
+		ImGui::Separator();
+
+		ImGui::Text("Shape Type");
+		ImGui::RadioButton("Sphere", &shapeType, SHAPE_SPHERE);
+		ImGui::SameLine();
+		ImGui::RadioButton("Box", &shapeType, SHAPE_BOX);
+		ImGui::SameLine();
+		ImGui::RadioButton("Plane", &shapeType, SHAPE_PLANE);
+
+		ImGui::Separator();
+
+		if (m_sceneOps.empty())
+		{
+			ImGui::Text("This will be the root shape.");
+		}
+		else
+		{
+			ImGui::Text("Operation");
+			ImGui::RadioButton("Union", &opType, OP_UNION);
+			ImGui::SameLine();
+			ImGui::RadioButton("Smooth Union", &opType, OP_SMOOTH_UNION);
+			ImGui::RadioButton("Intersection", &opType, OP_INTERSECTION);
+			ImGui::SameLine();
+			ImGui::RadioButton("Subtraction", &opType, OP_SUBTRACTION);
+
+			if (opType == OP_SMOOTH_UNION)
+			{
+				ImGui::DragFloat("Smooth K", &smoothK, 0.01f, 0.001f, 10.0f);
+			}
+
+			ImGui::Separator();
 		}
 
-		ImGui::PopID();
-	}
-	for (int i = 0; i < (int)m_boxes.size(); ++i)
-	{
-		auto& box = m_boxes[i];
-		std::string name = "Box " + std::to_string(i + 1);
-
-		ImGui::PushID(i);
-
-		if (ImGui::TreeNode(name.c_str()))
+		if (shapeType == SHAPE_SPHERE)
 		{
-			ImGui::DragFloat3("Position", glm::value_ptr(box.position), 0.1f);
-			ImGui::DragFloat3("Half-Size", glm::value_ptr(box.b), 0.1f);
-			ImGui::DragFloat("Radius", &box.r, 0.1f);
-
-			if (ImGui::TreeNode("Color"))
-			{
-				ImGui::ColorPicker3("Color", glm::value_ptr(box.color));
-				ImGui::TreePop();
-			}
-
-			if (ImGui::Button("Delete"))
-			{
-				m_boxes.erase(m_boxes.begin() + i);
-				ImGui::TreePop();
-				ImGui::PopID();
-				break;
-			}
-
-			ImGui::TreePop();
+			ImGui::DragFloat3("Center", glm::value_ptr(sphereCenter), 0.1f);
+			ImGui::DragFloat("Radius", &sphereRadius, 0.1f, 0.01f);
+			ImGui::ColorEdit3("Color", glm::value_ptr(sphereColor));
+			ImGui::Checkbox("Checker Texture", reinterpret_cast<bool*>(&sphereTex));
+		}
+		else if (shapeType == SHAPE_BOX)
+		{
+			ImGui::DragFloat3("Position", glm::value_ptr(boxPosition), 0.1f);
+			ImGui::DragFloat3("Half-Size", glm::value_ptr(boxHalfSize), 0.1f);
+			ImGui::DragFloat("Round Radius", &boxRoundRadius, 0.01f, 0.0f);
+			ImGui::ColorEdit3("Color", glm::value_ptr(boxColor));
+			ImGui::Checkbox("Checker Texture", reinterpret_cast<bool*>(&boxTex));
+		}
+		else if (shapeType == SHAPE_PLANE)
+		{
+			ImGui::DragFloat3("Normal", glm::value_ptr(planeNormal), 0.1f);
+			ImGui::DragFloat("Offset", &planeOffset, 0.1f);
+			ImGui::ColorEdit3("Color", glm::value_ptr(planeColor));
+			ImGui::Checkbox("Checker Texture", reinterpret_cast<bool*>(&planeTex));
 		}
 
-		ImGui::PopID();
-	}
-	for (int i = 0; i < (int)m_planes.size(); ++i)
-	{
-		auto& plane = m_planes[i];
-		std::string name = "Plane " + std::to_string(i + 1);
+		ImGui::Separator();
 
-		ImGui::PushID(i);
-
-		if (ImGui::TreeNode(name.c_str()))
+		if (ImGui::Button("Create"))
 		{
-			ImGui::DragFloat3("Normal", glm::value_ptr(plane.n), 0.1f, 0.0f, 1.0f);
-			ImGui::DragFloat("Offset", &plane.d, 0.1f);
+			createShape(shapeType, opType);
 
-			if (ImGui::TreeNode("Color"))
-			{
-				ImGui::ColorPicker3("Color", glm::value_ptr(plane.color));
-				ImGui::TreePop();
-			}
-
-			if (ImGui::Button("Delete"))
-			{
-				m_planes.erase(m_planes.begin() + i);
-				ImGui::TreePop();
-				ImGui::PopID();
-				break;
-			}
-
-			ImGui::TreePop();
+			ImGui::CloseCurrentPopup();
 		}
 
-		ImGui::PopID();
-	}
+		ImGui::SameLine();
 
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
 	ImGui::SeparatorText("Light");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::DragFloat3("Position", glm::value_ptr(m_lightPosition), 0.1f);
-	ImGui::SeparatorText("Settings");
+	ImGui::SeparatorText("Raymarching settings");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::Checkbox("Anti-Aliasing", &m_useAA);
+	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
+	ImGui::DragInt("Max steps", &m_maxSteps, 1, 10, 500);
 	ImGui::End();
 
 }
@@ -351,6 +455,71 @@ void Application::run()
 		processInput();
 	}
 	shutdown();
+}
+
+void Application::createShape(int shapeType, int opType)
+{
+	if (shapeType == SHAPE_SPHERE)
+	{
+		m_spheres.push_back({ sphereCenter, sphereRadius, sphereColor, sphereTex });
+		int shapeIndex = (int)m_spheres.size() - 1;
+
+		m_sceneOps.push_back({
+			SHAPE_SPHERE,
+			shapeIndex,
+			m_sceneOps.empty() ? OP_UNION : opType
+			});
+	}
+	else if (shapeType == SHAPE_BOX)
+	{
+		m_boxes.push_back({ boxPosition, boxHalfSize, boxRoundRadius, boxColor, boxTex });
+		int shapeIndex = (int)m_boxes.size() - 1;
+
+		m_sceneOps.push_back({
+			SHAPE_BOX,
+			shapeIndex,
+			m_sceneOps.empty() ? OP_UNION : opType
+			});
+	}
+	else if (shapeType == SHAPE_PLANE)
+	{
+		m_planes.push_back({ planeNormal, planeOffset, planeColor, planeTex });
+		int shapeIndex = (int)m_planes.size() - 1;
+
+		m_sceneOps.push_back({
+			SHAPE_PLANE,
+			shapeIndex,
+			m_sceneOps.empty() ? OP_UNION : opType
+			});
+	}
+}
+
+void Application::deleteShape(int shapeType, int shapeIndex, int sceneOpIndex)
+{
+	m_sceneOps.erase(m_sceneOps.begin() + sceneOpIndex);
+
+	switch (shapeType)
+	{
+	case SHAPE_SPHERE:
+		m_spheres.erase(m_spheres.begin() + shapeIndex);
+		break;
+
+	case SHAPE_BOX:
+		m_boxes.erase(m_boxes.begin() + shapeIndex);
+		break;
+
+	case SHAPE_PLANE:
+		m_planes.erase(m_planes.begin() + shapeIndex);
+		break;
+	}
+
+	for (auto& op : m_sceneOps)
+	{
+		if (op.shapeType == shapeType && op.shapeIndex > shapeIndex)
+		{
+			op.shapeIndex--;
+		}
+	}
 }
 
 
@@ -384,11 +553,6 @@ void Application::processInput()
 		// Show cursor
 		glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	}
-
-
-	onPressedKey(GLFW_KEY_2, [&]() {
-		createSphere(m_camera->getPosition() + m_camera->getForward() * 3.0f);
-	});
 
 	// if wasd keys are pressed, move the camera
 	if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) {

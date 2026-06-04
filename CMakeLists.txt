@@ -28,15 +28,29 @@ add_subdirectory(extern/glm)	#math library
 target_link_libraries("${CMAKE_PROJECT_NAME}" PUBLIC glfw glad glm)
 
 # Define MY_SOURCES to be a list of all the source files
-file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
-file(GLOB_RECURSE DEP CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/extern/imgui/*.cpp")
+file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+)
 
-target_sources("${CMAKE_PROJECT_NAME}" PRIVATE ${MY_SOURCES} )
-target_sources("${CMAKE_PROJECT_NAME}" PRIVATE ${DEP} )
+file(GLOB_RECURSE IMGUI_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/extern/imgui/*.cpp"
+)
+
+file(GLOB_RECURSE IMGUIZMO_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/extern/imguizmo/*.cpp"
+)
+
+target_sources("${CMAKE_PROJECT_NAME}" PRIVATE
+    ${MY_SOURCES}
+    ${IMGUI_SOURCES}
+    ${IMGUIZMO_SOURCES}
+)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/extern/imgui")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/extern/stb")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/extern/imguizmo")
+
 
 target_compile_definitions("${CMAKE_PROJECT_NAME}" PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD)
 target_compile_definitions("${CMAKE_PROJECT_NAME}" PRIVATE RES_DIR="${CMAKE_SOURCE_DIR}/res")

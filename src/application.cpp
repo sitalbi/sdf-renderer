@@ -9,6 +9,9 @@
 #include <imgui_impl_opengl3.h>
 #include "glm/glm.hpp"
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <ImGuizmo.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -214,6 +217,8 @@ void Application::updateUI()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
+	ImGuizmo::BeginFrame();
+
 	// Info Panel 
 	ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
 	ImGui::SetNextWindowSize(ImVec2(200, 500), ImGuiCond_FirstUseEver);
@@ -254,9 +259,12 @@ void Application::updateUI()
 					ImGui::TreePop();
 				}
 
+
+				selectShape(i);
+
 				if (ImGui::Button("Delete"))
 				{
-					deleteShape(ShapeType::SHAPE_SPHERE, sceneOp.shapeIndex, i);
+					eraseShape(SHAPE_SPHERE, sceneOp.shapeIndex, i);
 					ImGui::TreePop();
 					ImGui::PopID();
 					break;
@@ -274,7 +282,7 @@ void Application::updateUI()
 			if (sceneOp.name == "") sceneOp.name = "Box " + std::to_string(sceneOp.shapeIndex + 1);
 			std::string& name = sceneOp.name;
 
-			ImGui::PushID(sceneOp.shapeIndex);
+			ImGui::PushID(i);
 
 			if (ImGui::TreeNode(name.c_str()))
 			{
@@ -288,9 +296,11 @@ void Application::updateUI()
 					ImGui::TreePop();
 				}
 
+				selectShape(i);
+
 				if (ImGui::Button("Delete"))
 				{
-					deleteShape(ShapeType::SHAPE_BOX, sceneOp.shapeIndex, i);
+					eraseShape(SHAPE_BOX, sceneOp.shapeIndex, i);
 					ImGui::TreePop();
 					ImGui::PopID();
 					break;
@@ -308,7 +318,7 @@ void Application::updateUI()
 			if (sceneOp.name == "") sceneOp.name = "Plane " + std::to_string(sceneOp.shapeIndex + 1);
 			std::string& name = sceneOp.name;
 
-			ImGui::PushID(sceneOp.shapeIndex);
+			ImGui::PushID(i);
 
 			if (ImGui::TreeNode(name.c_str()))
 			{
@@ -323,7 +333,7 @@ void Application::updateUI()
 
 				if (ImGui::Button("Delete"))
 				{
-					deleteShape(ShapeType::SHAPE_PLANE, sceneOp.shapeIndex, i);
+					eraseShape(SHAPE_PLANE, sceneOp.shapeIndex, i);
 					ImGui::TreePop();
 					ImGui::PopID();
 					break;
@@ -338,7 +348,6 @@ void Application::updateUI()
 		default: break;
 		}
 	}
-
 
 	if (ImGui::Button("Add shape"))
 	{
@@ -426,6 +435,7 @@ void Application::updateUI()
 
 		ImGui::EndPopup();
 	}
+
 	ImGui::SeparatorText("Light");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::DragFloat3("Position", glm::value_ptr(m_lightPosition), 0.1f);
@@ -434,8 +444,9 @@ void Application::updateUI()
 	ImGui::Checkbox("Anti-Aliasing", &m_useAA);
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::DragInt("Max steps", &m_maxSteps, 1, 10, 500);
-	ImGui::End();
 
+	updateGizmo();
+	ImGui::End();
 }
 
 void Application::run()
@@ -494,8 +505,21 @@ void Application::createShape(int shapeType, int opType)
 	}
 }
 
-void Application::deleteShape(int shapeType, int shapeIndex, int sceneOpIndex)
+void Application::eraseShape(int shapeType, int shapeIndex, int sceneOpIndex)
 {
+	if (m_selectedShape.valid)
+	{
+		if (m_selectedShape.opIndex == sceneOpIndex)
+		{
+			m_selectedShape.valid = false;
+			m_selectedShape.opIndex = -1;
+		}
+		else if (m_selectedShape.opIndex > sceneOpIndex)
+		{
+			m_selectedShape.opIndex--;
+		}
+	}
+
 	m_sceneOps.erase(m_sceneOps.begin() + sceneOpIndex);
 
 	switch (shapeType)
@@ -673,4 +697,108 @@ unsigned int Application::loadCubemap(const std::array<std::string, 6>& faces)
 void Application::createSphere(glm::vec3 pos)
 {
 	m_spheres.push_back({ pos, 1.0, glm::vec3(1.0) });
+}
+
+glm::mat4 Application::getSelectedShapeTransform(const SceneOp& sceneOp) const
+{
+	if (!m_selectedShape.valid)
+	{
+		return glm::mat4(1.0f);
+	}
+
+	glm::vec3 position(0.0f);
+
+	switch (sceneOp.shapeType)
+	{
+	case SHAPE_SPHERE:
+		position = m_spheres[sceneOp.shapeIndex].center;
+		break;
+
+	case SHAPE_BOX:
+		position = m_boxes[sceneOp.shapeIndex].position;
+		break;
+
+	default:
+		break;
+	}
+
+	return glm::translate(glm::mat4(1.0f), position);
+}
+
+void Application::applySelectedShapeTransform(const glm::mat4& transform, const SceneOp& sceneOp)
+{
+	if (!m_selectedShape.valid)
+	{
+		return;
+	}
+
+	const glm::vec3 position = glm::vec3(transform[3]);
+
+	switch (sceneOp.shapeType)
+	{
+	case SHAPE_SPHERE:
+		m_spheres[sceneOp.shapeIndex].center = position;
+		break;
+
+	case SHAPE_BOX:
+		m_boxes[sceneOp.shapeIndex].position = position;
+		break;
+
+	default:
+		break;
+	}
+}
+
+void Application::updateGizmo()
+{
+	if (!m_selectedShape.valid)
+	{
+		return;
+	}
+
+	auto& sceneOp = m_sceneOps[m_selectedShape.opIndex];
+
+	ImGuizmo::SetOrthographic(false);
+	ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+
+	ImGuiIO& io = ImGui::GetIO();
+
+	ImGuizmo::SetRect(0.0f, 0.0f, io.DisplaySize.x, io.DisplaySize.y);
+
+	glm::mat4 view = m_camera->getViewMatrix();
+	glm::mat4 projection = m_camera->getProjectionMatrix();
+	glm::mat4 transform = getSelectedShapeTransform(sceneOp);
+
+	ImGuizmo::Manipulate(
+		glm::value_ptr(view),
+		glm::value_ptr(projection),
+		ImGuizmo::TRANSLATE,
+		ImGuizmo::WORLD,
+		glm::value_ptr(transform)
+	);
+
+	if (ImGuizmo::IsUsing())
+	{
+		applySelectedShapeTransform(transform, sceneOp);
+	}
+}
+
+void Application::selectShape(int index)
+{
+	if (m_selectedShape.opIndex != index)
+	{
+		if (ImGui::Button("Select"))
+		{
+			m_selectedShape.valid = true;
+			m_selectedShape.opIndex = index;
+		}
+	}
+	else
+	{
+		if (ImGui::Button("Deselect"))
+		{
+			m_selectedShape.valid = false;
+			m_selectedShape.opIndex = -1;
+		}
+	}
 }

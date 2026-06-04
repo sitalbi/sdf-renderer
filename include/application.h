@@ -59,6 +59,11 @@ struct SceneOp
 	std::string name;
 };
 
+struct SelectedShape
+{
+	bool valid = false;
+	int opIndex = -1;
+};
 
 
 class Application
@@ -75,7 +80,7 @@ public:
 	void run();
 
 	void createShape(int shapeType, int opType);
-	void deleteShape(int shapeType, int shapeIndex, int sceneOpIndex);
+	void eraseShape(int shapeType, int shapeIndex, int sceneOpIndex);
 
 	void setCallbacks();
 	void processInput();
@@ -107,6 +112,8 @@ private:
 
 	glm::vec3 m_lightPosition;
 
+	SelectedShape m_selectedShape;
+
 	unsigned int m_skyboxTexture;
 
 	bool m_useAA = false;
@@ -135,4 +142,10 @@ private:
 	unsigned int loadCubemap(const std::array<std::string, 6>& faces);
 	
 	void createSphere(glm::vec3 pos);
+
+	glm::mat4 getSelectedShapeTransform(const SceneOp& sceneOp) const;
+	void applySelectedShapeTransform(const glm::mat4& transform, const SceneOp& sceneOp);
+	void updateGizmo();
+
+	void selectShape(int index);
 };

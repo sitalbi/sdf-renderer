@@ -8,6 +8,7 @@ const int OP_UNION        = 0;
 const int OP_SMOOTH_UNION = 1;
 const int OP_INTERSECTION = 2;
 const int OP_SUBTRACTION  = 3;
+const int OP_SMOOTH_SUBTRACTION  = 4;
 
 struct HitSurface
 {
@@ -154,12 +155,26 @@ HitSurface opSubtraction(HitSurface a, HitSurface b)
     return hit;
 }
 
+
+HitSurface opSmoothSubtraction(HitSurface a, HitSurface b, float k)
+{
+    HitSurface hit;
+    float h = clamp(0.5 - 0.5 * (b.dist + a.dist) / k, 0.0, 1.0);
+    hit.dist = mix(a.dist, -b.dist, h) + k * h * (1.0 - h);
+
+    hit.color = a.color;
+    hit.tex = a.tex;
+
+    return hit;
+}
+
 HitSurface applyOp(HitSurface a, HitSurface b, int opType)
 {
     if (opType == OP_UNION)        return opUnion(a, b);
     if (opType == OP_SMOOTH_UNION) return opSmoothUnion(a, b, 0.5); // todo: configure the smooth factor (stop hardcoding 0.5)
     if (opType == OP_INTERSECTION) return opIntersection(a, b);
     if (opType == OP_SUBTRACTION)  return opSubtraction(a, b);
+    if (opType == OP_SMOOTH_SUBTRACTION)  return opSmoothSubtraction(a, b, 0.5);
     return opUnion(a, b);
 }
 

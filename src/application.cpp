@@ -358,7 +358,6 @@ void Application::updateUI()
 	{
 		static int shapeType = SHAPE_SPHERE;
 		static int opType = OP_UNION;
-		static float smoothK = 0.5f;
 
 		ImGui::Text("Create new shape");
 		ImGui::Separator();
@@ -385,11 +384,7 @@ void Application::updateUI()
 			ImGui::RadioButton("Intersection", &opType, OP_INTERSECTION);
 			ImGui::SameLine();
 			ImGui::RadioButton("Subtraction", &opType, OP_SUBTRACTION);
-
-			if (opType == OP_SMOOTH_UNION)
-			{
-				ImGui::DragFloat("Smooth K", &smoothK, 0.01f, 0.001f, 10.0f);
-			}
+			ImGui::RadioButton("Smooth Subtraction", &opType, OP_SMOOTH_SUBTRACTION);
 
 			ImGui::Separator();
 		}

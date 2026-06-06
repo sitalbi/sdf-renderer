@@ -3,11 +3,11 @@
 An experimental real-time Signed Distance Field (SDF) raymarching renderer written in C++ and OpenGL. 
 It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad.
 
-## Screenshots
+## Visuals
 <p align="center">
- <img src="res/screenshots/screen1.png" width="650">
+ <img src="res/screenshots/sdf_demo.gif" width="650">
 	<br>
- <em>Smooth-unioned SDF primitives with soft shadows</em>
+ <em>Example of a sphere used as a smooth subtraction primitive, moved across the scene.</em>
 </p>
 
 ## Features
@@ -34,7 +34,6 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 ## TODO:
 
 - performance optimizations:
-	- configurable max ray steps
 	- scene/object culling before evaluating SDFs
 	- bounding sphere or bounding box checks for primitives
 - implement reflections (skybox only first and maybe try recursive if perf ok)

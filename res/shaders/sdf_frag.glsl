@@ -10,18 +10,21 @@ const int OP_INTERSECTION = 2;
 const int OP_SUBTRACTION  = 3;
 const int OP_SMOOTH_SUBTRACTION  = 4;
 
-struct HitSurface
+const float PI = 3.14159265359;
+
+struct Material
 {
-    float dist;
-    vec3 color;
-    int tex;
+    vec3 albedo;
+    float metallic;
+    float roughness;
+    float ao;
 };
 
 struct Plane 
 {
     vec3 n;
     float d;
-    vec3 color;
+    Material material;
     int tex;
 };
 
@@ -29,7 +32,7 @@ struct Sphere
 {
     vec3 center;
     float radius;
-    vec3 color;
+    Material material;
     int tex;
 };
 
@@ -38,7 +41,7 @@ struct Box
     vec3 position;
     vec3 b;
     float r;
-    vec3 color;
+    Material material;
     int tex;
 };
 
@@ -48,6 +51,16 @@ struct SceneOp
     int shapeIndex;
     int opType;
 };
+
+
+struct HitSurface
+{
+    float dist;
+    vec3 color;
+    int tex;
+    Material mat;
+};
+
 
 uniform SceneOp uSceneOps[16];
 uniform int uSceneOpCount;
@@ -59,6 +72,8 @@ uniform Box uBoxes[8];
 uniform Plane uPlanes[8];
 
 uniform vec3 uLightPosition;
+uniform float uLightIntensity;
+uniform float uAmbientIntensity;
 
 uniform vec3 uBackgroundColor;
 uniform samplerCube uSkybox;
@@ -74,6 +89,13 @@ uniform float MAX_DIST = 100.0;
 uniform float EPSILON = 0.01;
 
 out vec4 FragColor;
+
+
+float DistributionGGX(vec3 N, vec3 H, float roughness);
+float GeometrySchlickGGX(float NdotV, float roughness);
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
+vec3 fresnelSchlick(float cosTheta, vec3 F0);
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness);
 
 
 // Distance Functions
@@ -103,21 +125,21 @@ HitSurface evalShape(vec3 position, int shapeType, int shapeIndex)
     if (shapeType == SHAPE_SPHERE)
     {
         hit.dist = sdSphere(position, uSpheres[shapeIndex].center, uSpheres[shapeIndex].radius);
-        hit.color = uSpheres[shapeIndex].color;
+        hit.mat = uSpheres[shapeIndex].material;
         hit.tex = uSpheres[shapeIndex].tex;
         return hit;
     }
     else if (shapeType == SHAPE_BOX)
     {
         hit.dist = sdRoundBox(position, uBoxes[shapeIndex].position, uBoxes[shapeIndex].b, uBoxes[shapeIndex].r);
-        hit.color = uBoxes[shapeIndex].color;
+        hit.mat = uBoxes[shapeIndex].material;
         hit.tex = uBoxes[shapeIndex].tex;
         return hit;
     }
     else
     {
         hit.dist = sdPlane(position, uPlanes[shapeIndex].n, uPlanes[shapeIndex].d);
-        hit.color = uPlanes[shapeIndex].color;
+        hit.mat = uPlanes[shapeIndex].material;
         hit.tex = uPlanes[shapeIndex].tex;
         return hit;
     }
@@ -141,7 +163,10 @@ HitSurface opSmoothUnion(HitSurface a, HitSurface b, float k )
     HitSurface hit;
     float h = clamp( 0.5 + 0.5*(b.dist-a.dist)/k, 0.0, 1.0 );
     hit.dist = mix(b.dist, a.dist, h ) - k*h*(1.0-h);
-    hit.color = mix(b.color, a.color, h );
+    hit.mat.albedo = mix(b.mat.albedo, a.mat.albedo, h );
+    hit.mat.metallic = mix(b.mat.metallic, a.mat.metallic, h );
+    hit.mat.roughness = mix(b.mat.roughness, a.mat.roughness, h );
+    hit.mat.ao = mix(b.mat.ao, a.mat.ao, h );
     hit.tex = (h>0.5) ? a.tex : b.tex;
     return hit;
 }
@@ -150,7 +175,7 @@ HitSurface opSubtraction(HitSurface a, HitSurface b)
 {
     HitSurface hit;
     hit.dist = max(a.dist, -b.dist);
-    hit.color = a.color;
+    hit.mat = a.mat;
     hit.tex = a.tex;
     return hit;
 }
@@ -162,7 +187,7 @@ HitSurface opSmoothSubtraction(HitSurface a, HitSurface b, float k)
     float h = clamp(0.5 - 0.5 * (b.dist + a.dist) / k, 0.0, 1.0);
     hit.dist = mix(a.dist, -b.dist, h) + k * h * (1.0 - h);
 
-    hit.color = a.color;
+    hit.mat = a.mat;
     hit.tex = a.tex;
 
     return hit;
@@ -178,11 +203,11 @@ HitSurface applyOp(HitSurface a, HitSurface b, int opType)
     return opUnion(a, b);
 }
 
+// Signed distance for the scene
 HitSurface sdScene(vec3 position)
 {
     HitSurface hit;
     hit.dist = 1e20;
-    hit.color = vec3(0.0);
     hit.tex = 0;
 
     if (uSceneOpCount == 0)
@@ -278,6 +303,46 @@ float checkerTexture(vec2 uv)
     return mod(c.x + c.y, 2.0);
 }
 
+vec3 shadePBR(vec3 p, vec3 n, vec3 viewDir, float lightDist, Material mat, float shadow)
+{
+    vec3 N = normalize(n);
+    vec3 V = normalize(viewDir);
+
+    vec3 L = normalize(uLightPosition - p);
+    vec3 H = normalize(V + L);
+    float distance = length(uLightPosition - p);
+    float attenuation = 1.0 / (distance * distance);
+        
+    vec3 lightColor = vec3(1.0) * uLightIntensity * 100.0f;
+    vec3 radiance = lightColor * attenuation;
+
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, mat.albedo, mat.metallic);
+
+    float NDF = DistributionGGX(N, H, mat.roughness);
+    float G = GeometrySmith(N, V, L, mat.roughness);
+    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+    vec3 kS = F;
+    vec3 kD = (vec3(1.0) - kS) * (1.0 - mat.metallic);
+
+    float NdotL = max(dot(N, L), 0.0);
+    float NdotV = max(dot(N, V), 0.0);
+
+    vec3 numerator    = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular     = numerator / denominator; 
+    vec3 diffuse = kD * mat.albedo / PI;
+    vec3 Lo = (diffuse + specular) * radiance * NdotL * shadow; 
+    
+    vec3 ambient = vec3(0.03) * uAmbientIntensity *  mat.albedo *  mat.ao;
+    vec3 color = ambient + Lo;
+	
+    color = color / (color + vec3(1.0));
+    color = pow(color, vec3(1.0/2.2));  
+
+    return color;
+}
+
 vec3 renderSample(vec2 fragCoord)
 {
     vec2 uv = (fragCoord / uResolution) * 2.0 - 1.0;
@@ -300,17 +365,17 @@ vec3 renderSample(vec2 fragCoord)
         float lightDist = length(toLight);
         vec3 lightDir = normalize(toLight);
 
-        float shadow = shadowRay(p + n * 0.01, lightDir, lightDist, 64.0);
-        float diffuse = max(dot(n, lightDir), 0.0) * shadow;
-        float ambient = 0.2;
+        float shadow = shadowRay(p + n * 0.01, lightDir, lightDist, 24.0);
+        vec3 viewDir = normalize(uCameraPos - p);
 
-        vec3 albedo = hit.color;
+        if(hit.tex > 0.0)
+        {
+            float pattern = checkerTexture(p.xz * 0.5);
+            vec3 checkerAlbedo = mix(hit.mat.albedo, hit.mat.albedo * 0.75, pattern);
+            hit.mat.albedo = mix(hit.mat.albedo, checkerAlbedo, hit.tex);
+        }
 
-        float pattern = checkerTexture(p.xz * 0.5);
-        vec3 checkerAlbedo = mix(albedo, albedo * 0.75, pattern);
-        albedo = mix(albedo, checkerAlbedo, hit.tex);
-
-        return albedo * (diffuse + ambient);
+        return shadePBR(p, n, viewDir, lightDist, hit.mat, shadow);
     }
     else
     {
@@ -343,3 +408,50 @@ void main()
     }
     FragColor = vec4(color, 1.0);
 }
+
+// PBR functions
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a      = roughness*roughness;
+    float a2     = a*a;
+    float NdotH  = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+	
+    float num   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+	
+    return num / denom;
+}
+
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float num   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+	
+    return num / denom;
+}
+
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2  = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1  = GeometrySchlickGGX(NdotL, roughness);
+	
+    return ggx1 * ggx2;
+}
+
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}  
+
+vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
+{
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}  

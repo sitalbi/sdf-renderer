@@ -11,20 +11,30 @@ constexpr int window_height = 1080;
 
 class Shader;
 
+struct Material
+{
+	glm::vec3 albedo = glm::vec3(0.5f,0.5f,0.5f);
+	float metallic = 0.5f;
+	float roughness = 0.5f;
+	float ao = 1.0f;
+};
+
 struct Plane
 {
 	glm::vec3 n;
 	float d;
-	glm::vec3 color;
+	//glm::vec3 color;
 	int texture = 0;
+	Material material;
 };
 
 struct Sphere
 {
 	glm::vec3 center;
 	float radius;
-	glm::vec3 color;
+	//glm::vec3 color;
 	int texture = 0;
+	Material material;
 };
 
 struct Box
@@ -32,8 +42,9 @@ struct Box
 	glm::vec3 position;
 	glm::vec3 b;
 	float r;
-	glm::vec3 color;
+	//glm::vec3 color;
 	int texture = 0;
+	Material material;
 };
 
 enum ShapeType
@@ -112,6 +123,8 @@ private:
 	std::vector<SceneOp> m_sceneOps;
 
 	glm::vec3 m_lightPosition;
+	float m_lightIntensity;
+	float m_ambientIntensity;
 
 	SelectedShape m_selectedShape;
 
@@ -124,25 +137,20 @@ private:
 	// Shape defaults
 	glm::vec3 sphereCenter = glm::vec3(0.0f);
 	float sphereRadius = 1.0f;
-	glm::vec3 sphereColor = glm::vec3(1.0f, 0.0f, 0.0f);
 	int sphereTex = 0;
 
 	glm::vec3 boxPosition = glm::vec3(0.0f);
 	glm::vec3 boxHalfSize = glm::vec3(1.0f);
 	float boxRoundRadius = 0.1f;
-	glm::vec3 boxColor = glm::vec3(1.0f, 1.0f, 0.0f);
 	int boxTex = 0;
 
 	glm::vec3 planeNormal = glm::vec3(0.0f, 1.0f, 0.0f);
 	float planeOffset = 0.0f;
-	glm::vec3 planeColor = glm::vec3(0.8f);
 	int planeTex = 0;
 
 	void onPressedKey(int key, const std::function<void()>& callback);
 
 	unsigned int loadCubemap(const std::array<std::string, 6>& faces);
-	
-	void createSphere(glm::vec3 pos);
 
 	glm::mat4 getSelectedShapeTransform(const SceneOp& sceneOp) const;
 	void applySelectedShapeTransform(const glm::mat4& transform, const SceneOp& sceneOp);

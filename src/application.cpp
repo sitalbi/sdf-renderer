@@ -106,12 +106,12 @@ int Application::init()
 
 	setCallbacks();
 
-	m_spheres.push_back({ glm::vec3(0, 0, 0), 1.f,glm::vec3(1.0, 0, 0) });
-	m_spheres.push_back({ glm::vec3(1.5, 0, 0),  0.5f,glm::vec3(0.1, 1, 0.1) });
+	m_spheres.push_back({ glm::vec3(0, 0, 0), 1.f});
+	m_spheres.push_back({ glm::vec3(1.5, 0, 0),  0.5f});
 
-	m_boxes.push_back({ glm::vec3(0, -2, 0),glm::vec3(2, 1, 1), 0.1f, glm::vec3(1.0, 1.0, 0) });
-	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f, glm::vec3(0.1, 0.1, 1.0) });
-	m_boxes.push_back({ glm::vec3(0, -4, 0),glm::vec3(20, 0.1, 20), 0.1f, glm::vec3(0.8, 0.8, 0.8), 1 });
+	m_boxes.push_back({ glm::vec3(0, -2, 0),glm::vec3(2, 1, 1), 0.1f });
+	m_boxes.push_back({ glm::vec3(0, 2, 0),glm::vec3(1, 0.5, 1), 0.1f });
+	m_boxes.push_back({ glm::vec3(0, -4, 0),glm::vec3(20, 0.1, 20), 0.1f, 1 });
 
 	m_sceneOps.clear();
 	m_sceneOps.push_back({ SHAPE_SPHERE, 0, OP_UNION});
@@ -121,6 +121,8 @@ int Application::init()
 	m_sceneOps.push_back({ SHAPE_BOX,    2, OP_SMOOTH_UNION });
 
 	m_lightPosition = glm::vec3(10, 5, 0);
+	m_lightIntensity = 1.0f;
+	m_ambientIntensity = 1.0f;
 
 	// Create and compile our GLSL program from the shaders
 	m_shader = new Shader(RES_DIR "/shaders/default_vert.glsl", RES_DIR"/shaders/sdf_frag.glsl");
@@ -168,6 +170,8 @@ void Application::update()
 
 	m_shader->setUniformVec2f("uResolution", m_camera->getResolution());
 	m_shader->setUniformVec3f("uLightPosition", m_lightPosition);
+	m_shader->setUniform1f("uLightIntensity", m_lightIntensity);
+	m_shader->setUniform1f("uAmbientIntensity", m_ambientIntensity);
 	m_shader->setUniformMat4f("uInverseViewProj", glm::inverse(m_camera->getProjectionMatrix() * m_camera->getViewMatrix()));
 	m_shader->setUniformVec3f("uCameraPos", m_camera->getPosition());
 	m_shader->setUniform1i("uAA", m_useAA);
@@ -178,8 +182,11 @@ void Application::update()
 	{
 		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].center", m_spheres[i].center);
 		m_shader->setUniform1f("uSpheres["+ std::to_string(i)+"].radius", m_spheres[i].radius);
-		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].color", m_spheres[i].color);
 		m_shader->setUniform1i("uSpheres["+ std::to_string(i)+"].tex", m_spheres[i].texture);
+		m_shader->setUniformVec3f("uSpheres[" + std::to_string(i) + "].material.albedo", m_spheres[i].material.albedo);
+		m_shader->setUniform1f("uSpheres[" + std::to_string(i) + "].material.metallic", m_spheres[i].material.metallic);
+		m_shader->setUniform1f("uSpheres[" + std::to_string(i) + "].material.roughness", m_spheres[i].material.roughness);
+		m_shader->setUniform1f("uSpheres[" + std::to_string(i) + "].material.ao", m_spheres[i].material.ao);
 	}
 
 	for (int i = 0; i < m_boxes.size(); i++)
@@ -187,16 +194,22 @@ void Application::update()
 		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].position", m_boxes[i].position);
 		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].b", m_boxes[i].b);
 		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].r", m_boxes[i].r);
-		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].color", m_boxes[i].color);
 		m_shader->setUniform1i("uBoxes[" + std::to_string(i) + "].tex", m_boxes[i].texture);
+		m_shader->setUniformVec3f("uBoxes[" + std::to_string(i) + "].material.albedo", m_boxes[i].material.albedo);
+		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].material.metallic", m_boxes[i].material.metallic);
+		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].material.roughness", m_boxes[i].material.roughness);
+		m_shader->setUniform1f("uBoxes[" + std::to_string(i) + "].material.ao", m_boxes[i].material.ao);
 	}
 
 	for (int i = 0; i < m_planes.size(); i++)
 	{
 		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].n", m_planes[i].n);
 		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].d", m_planes[i].d);
-		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].color", m_planes[i].color);
 		m_shader->setUniform1i("uPlanes[" + std::to_string(i) + "].tex", m_planes[i].texture);
+		m_shader->setUniformVec3f("uPlanes[" + std::to_string(i) + "].material.albedo", m_planes[i].material.albedo);
+		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].material.metallic", m_planes[i].material.metallic);
+		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].material.roughness", m_planes[i].material.roughness);
+		m_shader->setUniform1f("uPlanes[" + std::to_string(i) + "].material.ao", m_planes[i].material.ao);
 	}
 
 	m_shader->setUniform1i("uSceneOpCount", m_sceneOps.size());
@@ -253,9 +266,12 @@ void Application::updateUI()
 				ImGui::DragFloat3("Position", glm::value_ptr(sphere.center), 0.1f);
 				ImGui::DragFloat("Radius", &sphere.radius, 0.1f);
 
-				if (ImGui::TreeNode("Color"))
+				if (ImGui::TreeNode("Material"))
 				{
-					ImGui::ColorPicker3("Color", glm::value_ptr(sphere.color));
+					ImGui::ColorPicker3("Albedo", glm::value_ptr(sphere.material.albedo));
+					ImGui::DragFloat("Metallic", &sphere.material.metallic, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Roughness", &sphere.material.roughness, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Ambient Occlusion", &sphere.material.ao, 0.01f, 0.0f, 1.0f);
 					ImGui::TreePop();
 				}
 
@@ -290,9 +306,12 @@ void Application::updateUI()
 				ImGui::DragFloat3("Half-Size", glm::value_ptr(box.b), 0.1f);
 				ImGui::DragFloat("Radius", &box.r, 0.1f);
 
-				if (ImGui::TreeNode("Color"))
+				if (ImGui::TreeNode("Material"))
 				{
-					ImGui::ColorPicker3("Color", glm::value_ptr(box.color));
+					ImGui::ColorPicker3("Albedo", glm::value_ptr(box.material.albedo));
+					ImGui::DragFloat("Metallic", &box.material.metallic, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Roughness", &box.material.roughness, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Ambient Occlusion", &box.material.ao, 0.01f, 0.0f, 1.0f);
 					ImGui::TreePop();
 				}
 
@@ -325,9 +344,12 @@ void Application::updateUI()
 				ImGui::DragFloat3("Normal", glm::value_ptr(plane.n), 0.1f, 0.0f, 1.0f);
 				ImGui::DragFloat("Offset", &plane.d, 0.1f);
 
-				if (ImGui::TreeNode("Color"))
+				if (ImGui::TreeNode("Material"))
 				{
-					ImGui::ColorPicker3("Color", glm::value_ptr(plane.color));
+					ImGui::ColorPicker3("Albedo", glm::value_ptr(plane.material.albedo));
+					ImGui::DragFloat("Metallic", &plane.material.metallic, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Roughness", &plane.material.roughness, 0.01f, 0.0f, 1.0f);
+					ImGui::DragFloat("Ambient Occlusion", &plane.material.ao, 0.01f, 0.0f, 1.0f);
 					ImGui::TreePop();
 				}
 
@@ -393,7 +415,6 @@ void Application::updateUI()
 		{
 			ImGui::DragFloat3("Center", glm::value_ptr(sphereCenter), 0.1f);
 			ImGui::DragFloat("Radius", &sphereRadius, 0.1f, 0.01f);
-			ImGui::ColorEdit3("Color", glm::value_ptr(sphereColor));
 			ImGui::Checkbox("Checker Texture", reinterpret_cast<bool*>(&sphereTex));
 		}
 		else if (shapeType == SHAPE_BOX)
@@ -401,14 +422,12 @@ void Application::updateUI()
 			ImGui::DragFloat3("Position", glm::value_ptr(boxPosition), 0.1f);
 			ImGui::DragFloat3("Half-Size", glm::value_ptr(boxHalfSize), 0.1f);
 			ImGui::DragFloat("Round Radius", &boxRoundRadius, 0.01f, 0.0f);
-			ImGui::ColorEdit3("Color", glm::value_ptr(boxColor));
 			ImGui::Checkbox("Checker Texture", reinterpret_cast<bool*>(&boxTex));
 		}
 		else if (shapeType == SHAPE_PLANE)
 		{
 			ImGui::DragFloat3("Normal", glm::value_ptr(planeNormal), 0.1f);
 			ImGui::DragFloat("Offset", &planeOffset, 0.1f);
-			ImGui::ColorEdit3("Color", glm::value_ptr(planeColor));
 			ImGui::Checkbox("Checker Texture", reinterpret_cast<bool*>(&planeTex));
 		}
 
@@ -434,6 +453,8 @@ void Application::updateUI()
 	ImGui::SeparatorText("Light");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::DragFloat3("Position", glm::value_ptr(m_lightPosition), 0.1f);
+	ImGui::DragFloat("Intensity", &m_lightIntensity, 0.1f, 0.0f, 10.0);
+	ImGui::DragFloat("Ambient Intensity", &m_ambientIntensity, 0.1f, 0.0f, 10.0f);
 	ImGui::SeparatorText("Raymarching settings");
 	ImGui::PushItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
 	ImGui::Checkbox("Anti-Aliasing", &m_useAA);
@@ -467,7 +488,7 @@ void Application::createShape(int shapeType, int opType)
 {
 	if (shapeType == SHAPE_SPHERE)
 	{
-		m_spheres.push_back({ sphereCenter, sphereRadius, sphereColor, sphereTex });
+		m_spheres.push_back({ sphereCenter, sphereRadius, sphereTex });
 		int shapeIndex = (int)m_spheres.size() - 1;
 
 		m_sceneOps.push_back({
@@ -478,7 +499,7 @@ void Application::createShape(int shapeType, int opType)
 	}
 	else if (shapeType == SHAPE_BOX)
 	{
-		m_boxes.push_back({ boxPosition, boxHalfSize, boxRoundRadius, boxColor, boxTex });
+		m_boxes.push_back({ boxPosition, boxHalfSize, boxRoundRadius, boxTex });
 		int shapeIndex = (int)m_boxes.size() - 1;
 
 		m_sceneOps.push_back({
@@ -489,7 +510,7 @@ void Application::createShape(int shapeType, int opType)
 	}
 	else if (shapeType == SHAPE_PLANE)
 	{
-		m_planes.push_back({ planeNormal, planeOffset, planeColor, planeTex });
+		m_planes.push_back({ planeNormal, planeOffset, planeTex });
 		int shapeIndex = (int)m_planes.size() - 1;
 
 		m_sceneOps.push_back({
@@ -687,11 +708,6 @@ unsigned int Application::loadCubemap(const std::array<std::string, 6>& faces)
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
 	return textureID;
-}
-
-void Application::createSphere(glm::vec3 pos)
-{
-	m_spheres.push_back({ pos, 1.0, glm::vec3(1.0) });
 }
 
 glm::mat4 Application::getSelectedShapeTransform(const SceneOp& sceneOp) const

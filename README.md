@@ -10,13 +10,21 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
  <em>Example of a sphere used as a smooth subtraction primitive, moved across the scene.</em>
 </p>
 
+<p align="center">
+ <img src="res/screenshots/screen2.png" width="650">
+</p>
+
+<p align="center">
+ <img src="res/screenshots/screen3.png" width="650">
+ </p>
+
 ## Features
 
 - Raymarching-based rendering of Signed Distance Fields
 - Primitive support: spheres, rounded boxes, planes
 - Scene composition using SDF operations
 - Skybox background
-- Basic ambient + diffuse lighting with soft shadows.
+- PBR shading (albedo, metalic, roughness, ambient occlusion) with image based lighting (IBL)
 - Basic scene editor with ImGui:
 	- inspect and edit shapes
 	- create / delete shapes
@@ -34,10 +42,8 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 ## TODO:
 
 - performance optimizations:
-	- scene/object culling before evaluating SDFs
+	- scene/object culling cpu side
 	- bounding sphere or bounding box checks for primitives
-- implement reflections (skybox only first and maybe try recursive if perf ok)
-- pbr shading
 
 ### Requirements
 
@@ -50,12 +56,13 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 
 ### Dependencies
 
-Dependencies included as git submodules:
+Dependencies included:
 
 - [GLFW](https://www.glfw.org/)
 - [GLAD](https://glad.dav1d.de/)
 - [glm](https://github.com/g-truc/glm)
 - [imgui](https://github.com/ocornut/imgui)
+- [imguizmo](https://github.com/cedricguillemet/imguizmo)
 - [stb](https://github.com/nothings/stb)
 
 

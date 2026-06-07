@@ -73,10 +73,14 @@ uniform Plane uPlanes[8];
 
 uniform vec3 uLightPosition;
 uniform float uLightIntensity;
-uniform float uAmbientIntensity;
+uniform float uExposure;
 
-uniform vec3 uBackgroundColor;
 uniform samplerCube uSkybox;
+uniform samplerCube uIrradianceMap;
+
+// Specular IBL prefiltered map
+uniform samplerCube uPrefilterMap;
+uniform sampler2D uBRDFLUT;
 
 uniform vec2 uResolution;
 
@@ -96,6 +100,7 @@ float GeometrySchlickGGX(float NdotV, float roughness);
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness);
 vec3 fresnelSchlick(float cosTheta, vec3 F0);
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness);
+vec3 acesToneMapping(vec3 x);
 
 
 // Distance Functions
@@ -310,18 +315,18 @@ vec3 shadePBR(vec3 p, vec3 n, vec3 viewDir, float lightDist, Material mat, float
 
     vec3 L = normalize(uLightPosition - p);
     vec3 H = normalize(V + L);
-    float distance = length(uLightPosition - p);
-    float attenuation = 1.0 / (distance * distance);
+//    float distance = length(uLightPosition - p);
+//    float attenuation = 1.0 / (distance * distance);
         
-    vec3 lightColor = vec3(1.0) * uLightIntensity * 100.0f;
-    vec3 radiance = lightColor * attenuation;
+    vec3 lightColor = vec3(1.0);
+    vec3 radiance = lightColor * uLightIntensity;
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, mat.albedo, mat.metallic);
 
     float NDF = DistributionGGX(N, H, mat.roughness);
     float G = GeometrySmith(N, V, L, mat.roughness);
-    vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+    vec3 F = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, mat.roughness);
     vec3 kS = F;
     vec3 kD = (vec3(1.0) - kS) * (1.0 - mat.metallic);
 
@@ -332,13 +337,32 @@ vec3 shadePBR(vec3 p, vec3 n, vec3 viewDir, float lightDist, Material mat, float
     float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
     vec3 specular     = numerator / denominator; 
     vec3 diffuse = kD * mat.albedo / PI;
-    vec3 Lo = (diffuse + specular) * radiance * NdotL * shadow; 
     
-    vec3 ambient = vec3(0.03) * uAmbientIntensity *  mat.albedo *  mat.ao;
-    vec3 color = ambient + Lo;
+     // IBL (ambient lighting)
+    // Diffuse IBL
+    vec3 irradiance    = texture(uIrradianceMap, N).rgb;
+    vec3 diffuseIBL    = irradiance * mat.albedo;
+
+    // Specular IBL
+    vec3 R = reflect(-V, N);
+    const float MAX_LOD = 4.0;
+    vec3 prefiltered = textureLod(uPrefilterMap, R, mat.roughness * MAX_LOD).rgb;
+    vec2 brdfLookup = texture(uBRDFLUT, vec2(max(dot(N,V),0.0), mat.roughness)).rg;
+    vec3 specularIBL = prefiltered * (F * brdfLookup.x + brdfLookup.y);
+    
+    vec3 directLighting = (diffuse + specular)  * radiance  * NdotL  * shadow;
+
+    vec3 ambientLighting = (kD * diffuseIBL + specularIBL) * mat.ao;
+    vec3 color = directLighting + ambientLighting;
 	
-    color = color / (color + vec3(1.0));
-    color = pow(color, vec3(1.0/2.2));  
+    // exposure
+    color *= uExposure;
+
+    // tone map
+    color = acesToneMapping(color);
+
+    // gamma correct
+    color = pow(color, vec3(1.0 / 2.2));
 
     return color;
 }
@@ -379,7 +403,11 @@ vec3 renderSample(vec2 fragCoord)
     }
     else
     {
-        return texture(uSkybox, rd).rgb;
+        vec3 sky = texture(uSkybox, rd).rgb;
+        sky *= uExposure;
+        sky = acesToneMapping(sky);
+        sky = pow(sky, vec3(1.0 / 2.2));
+        return sky;
     }
 }
 
@@ -455,3 +483,14 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }  
+
+vec3 acesToneMapping(vec3 x)
+{
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}

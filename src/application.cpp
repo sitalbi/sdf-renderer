@@ -965,22 +965,34 @@ glm::mat4 Application::getSelectedShapeTransform(const SceneOp& sceneOp) const
 	}
 
 	glm::vec3 position(0.0f);
+	glm::vec3 scale(1.0f);
 
 	switch (sceneOp.shapeType)
 	{
 	case SHAPE_SPHERE:
-		position = m_spheres[sceneOp.shapeIndex].center;
+	{
+		const auto& sphere = m_spheres[sceneOp.shapeIndex];
+		position = sphere.center;
+		scale = glm::vec3(sphere.radius);
 		break;
+	}
 
 	case SHAPE_BOX:
-		position = m_boxes[sceneOp.shapeIndex].position;
+	{
+		const auto& box = m_boxes[sceneOp.shapeIndex];
+		position = box.position;
+		scale = box.b;
 		break;
+	}
 
 	default:
 		break;
 	}
 
-	return glm::translate(glm::mat4(1.0f), position);
+	glm::mat4 transform = glm::translate(glm::mat4(1.0f), position);
+	transform = glm::scale(transform, scale);
+
+	return transform;
 }
 
 void Application::applySelectedShapeTransform(const glm::mat4& transform, const SceneOp& sceneOp)
@@ -991,16 +1003,29 @@ void Application::applySelectedShapeTransform(const glm::mat4& transform, const 
 	}
 
 	const glm::vec3 position = glm::vec3(transform[3]);
+	const glm::vec3 scale = glm::vec3(glm::length(glm::vec3(transform[0])), glm::length(glm::vec3(transform[1])), glm::length(glm::vec3(transform[2])));
 
 	switch (sceneOp.shapeType)
 	{
 	case SHAPE_SPHERE:
-		m_spheres[sceneOp.shapeIndex].center = position;
+	{
+		auto& sphere = m_spheres[sceneOp.shapeIndex];
+		sphere.center = position;
+
+		// Spheres only support uniform scale.
+		sphere.radius = glm::max(0.01f, (scale.x + scale.y + scale.z) / 3.0f);
 		break;
+	}
 
 	case SHAPE_BOX:
-		m_boxes[sceneOp.shapeIndex].position = position;
+	{
+		auto& box = m_boxes[sceneOp.shapeIndex];
+		box.position = position;
+
+		// Box half-size.
+		box.b = glm::max(scale, glm::vec3(0.01f));
 		break;
+	}
 
 	default:
 		break;
@@ -1030,7 +1055,7 @@ void Application::updateGizmo()
 	ImGuizmo::Manipulate(
 		glm::value_ptr(view),
 		glm::value_ptr(projection),
-		ImGuizmo::TRANSLATE,
+		ImGuizmo::TRANSLATE | ImGuizmo::SCALE,
 		ImGuizmo::WORLD,
 		glm::value_ptr(transform)
 	);

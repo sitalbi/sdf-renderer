@@ -6,8 +6,6 @@ It renders SDF scenes by raymarching in the fragment shader on a fullscreen quad
 ## Visuals
 <p align="center">
  <img src="res/screenshots/screen1.gif" width="650">
-	<br>
- <em>Example of a sphere used as a smooth subtraction primitive, moved across the scene.</em>
 </p>
 
 <p align="center">
